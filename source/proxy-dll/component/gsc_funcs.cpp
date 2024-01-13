@@ -607,7 +607,8 @@ namespace gsc_funcs
 				auto obj = member.GetObj();
 				obj.AddMember(rapidjson::StringRef(gsc_json_type), "hash", doc.GetAllocator());
 				auto hash = val->u.intValue & 0x7FFFFFFFFFFFFFFF;
-				std::string name = std::format("hash_{:x}", hash);
+				const char* lookup = hashes::lookup(hash);
+				std::string name = lookup ? lookup : std::format("hash_{:x}", hash);
 				obj.AddMember(rapidjson::StringRef("hash"), name, doc.GetAllocator());
 			}
 			break;
@@ -646,7 +647,8 @@ namespace gsc_funcs
 							}
 							else
 							{
-								std::string keyval = std::format("#var_{:x}", var->nameIndex);
+								const char* name = hashes::lookup(var->nameIndex);
+								std::string keyval = name ? std::format("#{}", name) : std::format("#var_{:x}", var->nameIndex);
 								rapidjson::Value keyjson{ rapidjson::kStringType };
 								keyjson.SetString(keyval, doc.GetAllocator());
 								obj.AddMember(keyjson, subval, doc.GetAllocator());
@@ -679,7 +681,8 @@ namespace gsc_funcs
 							// read struct value
 							shield_to_json_val(inst, value, subval, doc, depth + 1);
 
-							std::string keyval = std::format("var_{:x}", var->nameIndex);
+							const char* name = hashes::lookup(var->nameIndex);
+							std::string keyval = name ? name : std::format("var_{:x}", var->nameIndex);
 							rapidjson::Value keyjson{ rapidjson::kStringType };
 							keyjson.SetString(keyval, doc.GetAllocator());
 							obj.AddMember(keyjson, subval, doc.GetAllocator());
@@ -948,15 +951,96 @@ namespace gsc_funcs
 
 			shield_from_json_push_struct(inst, doc);
 		}
-		
+
+		void add_debug_command(game::scriptInstance_t inst)
+		{
+			int localclientnum;
+			const char* cmd;
+
+			if (inst == game::SCRIPTINSTANCE_CLIENT)
+			{
+				// client, using param
+				localclientnum = (int)game::ScrVm_GetInt(inst, 0);
+				cmd = game::ScrVm_GetString(inst, 1);
+			}
+			else
+			{
+				// server, using primary
+				localclientnum = game::Com_LocalClients_GetPrimary();
+				cmd = game::ScrVm_GetString(inst, 0);
+			}
+
+			game::Cbuf_AddText(localclientnum, cmd);
+		}
+
+		void register_hash(game::scriptInstance_t inst)
+		{
+			int64_t type = game::ScrVm_GetInt(inst, 0);
+
+			int params = game::ScrVm_GetNumParam(inst);
+
+			for (int i = 1; i < params; i++)
+			{
+				if (game::ScrVm_GetType(inst, i) != game::TYPE_STRING)
+				{
+					gsc_error("invalid hash param, a string should be used, received: %s at param %i", inst, false, game::var_typename[game::ScrVm_GetType(inst, i)], i);
+					return;
+				}
+				const char* hash = game::ScrVm_GetString(inst, i);
+
+				if (!type || (type & 1))
+				{
+					// the hash is added by the function
+					fnv1a::generate_hash(hash);
+				}
+
+				if (!type || (type & 2))
+				{
+					// the hash is added by the function
+					gsc_funcs::canon_hash(hash);
+				}
+			}
+		}
+
+		void register_dvar_name(game::scriptInstance_t inst)
+		{
+			if (game::ScrVm_GetType(inst, 0) != game::TYPE_STRING)
+			{
+				gsc_error("invalid name param, a string should be used, received: %s", inst, false, game::var_typename[game::ScrVm_GetType(inst, 0)]);
+				return;
+			}
+			const char* name = game::ScrVm_GetString(inst, 0);
+			const char* description = "";
+
+			if (game::ScrVm_GetNumParam(inst) == 2)
+			{
+				if (game::ScrVm_GetType(inst, 1) != game::TYPE_STRING)
+				{
+					gsc_error("invalid description param, a string should be used, received: %s", inst, false, game::var_typename[game::ScrVm_GetType(inst, 1)]);
+					return;
+				}
+				description = game::ScrVm_GetString(inst, 1);
+			}
+
+			int64_t hash = fnv1a::generate_hash(name);
+
+			// test if already in the set
+			auto it = std::find_if(variables::dvars_record.begin(), variables::dvars_record.end(), [&hash](variables::varEntry& i) { return i.fnv1a == hash; });
+
+			if (it == variables::dvars_record.end())
+			{
+				variables::dvars_record.emplace_back(variables::varInfo{ name, description, (uint64_t)hash });
+			}
+		}
+
 		game::BO4_BuiltinFunctionDef custom_functions_gsc[] =
 		{
 			{ // ShieldLog(message)
 				.canonId = canon_hash("ShieldLog"),
-				.min_args = 1,
-				.max_args = 1,
-				.actionFunc = shield_log,
-				.type = 0,
+					.min_args = 1,
+					.max_args = 1,
+					.actionFunc = shield_log,
+					.type = 0,
 			},
 			{ // ShieldClearHudElems()
 				.canonId = canon_hash("ShieldClearHudElems"),
@@ -1047,6 +1131,20 @@ namespace gsc_funcs
 				.min_args = 1,
 				.max_args = 2,
 				.actionFunc = shield_to_json,
+				.type = 0
+			},
+			{// ShieldRegisterHash(int type, string... values)
+				.canonId = canon_hash("ShieldRegisterHash"),
+				.min_args = 2,
+				.max_args = 200,
+				.actionFunc = register_hash,
+				.type = 0
+			},
+			{// ShieldRegisterHash(string name, string description = "")
+				.canonId = canon_hash("ShieldRegisterDVarName"),
+				.min_args = 1,
+				.max_args = 2,
+				.actionFunc = register_dvar_name,
 				.type = 0
 			}
 		};
@@ -1142,9 +1240,23 @@ namespace gsc_funcs
 				.max_args = 2,
 				.actionFunc = shield_to_json,
 				.type = 0
+			},
+			{// ShieldRegisterHash(int type, string... values)
+				.canonId = canon_hash("ShieldRegisterHash"),
+				.min_args = 2,
+				.max_args = 200,
+				.actionFunc = register_hash,
+				.type = 0
+			},
+			{// ShieldRegisterHash(string name, string description = "")
+				.canonId = canon_hash("ShieldRegisterDVarName"),
+				.min_args = 1,
+				.max_args = 2,
+				.actionFunc = register_dvar_name,
+				.type = 0
 			}
 		};
-
+		
 		void draw_hud()
 		{
 			const game::vec_t screen_width = game::ScrPlace_GetView(0)->realViewportSize[0];
@@ -1464,6 +1576,10 @@ namespace gsc_funcs
 	public:
 		void post_unpack() override
 		{
+			// replace nulled function references
+			reinterpret_cast<game::BO4_BuiltinFunctionDef*>(0x144ED5D90_g)->actionFunc = add_debug_command; // csc
+			reinterpret_cast<game::BO4_BuiltinFunctionDef*>(0x1449BAD60_g)->actionFunc = add_debug_command; // gsc
+
 			// enable dev functions still available in the game
 			enable_dev_func = utilities::json_config::ReadBoolean("gsc", "dev_funcs", false);
 

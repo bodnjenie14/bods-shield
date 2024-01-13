@@ -12,7 +12,7 @@ namespace variables
 	struct varInfo
 	{
 		std::string name;
-		const char* desc;
+		std::string desc;
 		uint64_t fnv1a;
 	};
 

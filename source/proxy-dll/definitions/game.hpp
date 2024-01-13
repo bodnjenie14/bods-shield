@@ -907,6 +907,7 @@ namespace game
 
 	// CMD
 	WEAK symbol<void(int localClientNum, const char* text)> Cbuf_AddText{ 0x143CDE880_g };
+	WEAK symbol<int()> Com_LocalClients_GetPrimary{ 0x142893AF0_g };
 
 	// Dvar
 	WEAK symbol<void* (const char* dvarName)> Dvar_FindVar{ 0x143CEBE40_g };

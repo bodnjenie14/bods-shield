@@ -283,7 +283,7 @@ namespace game_console
 					draw_hint_text(0, dvars::get_value_string(dvar, &dvar->value->current).data(), con_inputDvarMatchColor, offset_x);
 					draw_hint_text(1, "  default", con_inputDvarInactiveValueColor);
 					draw_hint_text(1, dvars::get_value_string(dvar, &dvar->value->reset).data(), con_inputDvarInactiveValueColor, offset_x);
-					draw_hint_text(2, matches[0].desc, con_inputDescriptionColor, 0);
+					draw_hint_text(2, matches[0].desc.data(), con_inputDescriptionColor, 0);
 
 					auto offset_y = height + 3.f;
 					auto domain_lines = 1;
@@ -297,7 +297,7 @@ namespace game_console
 				{
 					auto offset_x = (con.screen_max[0] - con.screen_pointer.x) / 4.f;
 
-					draw_hint_text(0, matches[0].desc, con_inputCmdMatchColor, offset_x);
+					draw_hint_text(0, matches[0].desc.data(), con_inputCmdMatchColor, offset_x);
 				}
 
 				strncpy_s(con.auto_complete_choice, matches[0].name.data(), 64);
@@ -314,7 +314,7 @@ namespace game_console
 					auto* const dvar = dvars::find_dvar(matches[i].fnv1a);
 
 					draw_hint_text(static_cast<int>(i), matches[i].name.data(), dvar ? con_inputDvarMatchColor : con_inputCmdMatchColor);
-					draw_hint_text(static_cast<int>(i), matches[i].desc, dvar ? con_inputDvarMatchColor : con_inputCmdMatchColor, offset_x * 1.5f);
+					draw_hint_text(static_cast<int>(i), matches[i].desc.data(), dvar ? con_inputDvarMatchColor : con_inputCmdMatchColor, offset_x * 1.5f);
 
 					if (dvar)
 					{
