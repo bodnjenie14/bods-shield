@@ -1022,14 +1022,14 @@ namespace gsc_funcs
 				description = game::ScrVm_GetString(inst, 1);
 			}
 
-			int64_t hash = fnv1a::generate_hash(name);
+			uint64_t hash = fnv1a::generate_hash(name);
 
 			// test if already in the set
 			auto it = std::find_if(variables::dvars_record.begin(), variables::dvars_record.end(), [&hash](variables::varEntry& i) { return i.fnv1a == hash; });
 
 			if (it == variables::dvars_record.end())
 			{
-				variables::dvars_record.emplace_back(variables::varInfo{ name, description, (uint64_t)hash });
+				variables::dvars_record.emplace_back(variables::varInfo{ name, description, hash });
 			}
 		}
 
@@ -1497,7 +1497,7 @@ namespace gsc_funcs
 		static char scriptnamebuffer[game::scriptInstance_t::SCRIPTINSTANCE_MAX][0x200];
 		game::GSC_OBJ* script_obj = nullptr;
 		{
-			game::scoped_critical_section scs{ 0x36, game::SCOPED_CRITSECT_NORMAL };
+			game::scoped_critical_section scs{ game::CRITSECT_GSC_OBJECTS, game::SCOPED_CRITSECT_NORMAL };
 
 			uint32_t count = game::gObjFileInfoCount[inst];
 
@@ -1595,7 +1595,7 @@ namespace gsc_funcs
 			utilities::hook::jump(0x142890470_g, scrvm_log_compiler_error);
 
 			// better runtime error
-			utilities::hook::jump(0x142748550_g, get_gsc_export_info);
+			utilities::hook::jump(game::Scr_GetGscExportInfo.get(), get_gsc_export_info);
 			patch_scrvm_runtime_error();
 			
 			scheduler::loop(draw_hud, scheduler::renderer);

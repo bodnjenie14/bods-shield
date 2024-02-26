@@ -1219,6 +1219,10 @@ namespace mods {
 				{
 					logger::write(logger::LOG_TYPE_ERROR, std::format("error when loading hook lua {} (pre)", name));
 				}
+				else
+				{
+					logger::write(logger::LOG_TYPE_DEBUG, std::format("loaded hook lua {} (pre)", name));
+				}
 			}
 		}
 
@@ -1234,6 +1238,10 @@ namespace mods {
 				if (!game::Lua_CoD_LoadLuaFile(state, name.c_str()))
 				{
 					logger::write(logger::LOG_TYPE_ERROR, std::format("error when loading hook lua {} (post)", name));
+				}
+				else
+				{
+					logger::write(logger::LOG_TYPE_DEBUG, std::format("loaded hook lua {} (post)", name));
 				}
 			}
 		}
