@@ -5271,10 +5271,6 @@ namespace variables
 			"Exec file, Usage: exec <config>"
 		),
 		create_var_record(
-			"killserver",
-			"Kill server"
-		),
-		create_var_record(
 			"disconnect",
 			"Disconnect from server"
 		),

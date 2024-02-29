@@ -8,6 +8,7 @@
 #include "gsc_custom.hpp"
 #include "dvars.hpp"
 #include "hashes.hpp"
+#include "weapons.hpp"
 
 #include "loader/component_loader.hpp"
 #include <utilities/io.hpp>
@@ -240,6 +241,7 @@ namespace mods {
 				csv_files.clear();
 				localizes.clear();
 				cache_entries.clear();
+				weapons::clear_weapon_defs();
 
 				for (auto& redirect : assets_redirects)
 				{
@@ -356,6 +358,8 @@ namespace mods {
 
 					return it->get_header();
 				}
+				case xassets::ASSET_TYPE_WEAPON:
+					return weapons::get_weapon_asset(name);
 				default:
 					return nullptr; // unknown resource type
 				}
@@ -776,6 +780,10 @@ namespace mods {
 
 					return hashes::load_file(path, format);
 				}
+				else if (!_strcmpi("weapon", type_val))
+				{
+					return weapons::load_weapon_def(member, mod_name, mod_path);
+				}
 				else
 				{
 					logger::write(logger::LOG_TYPE_ERROR, std::format("mod {} is load data member with an unknown type '{}'", mod_name, type_val));
@@ -1141,7 +1149,14 @@ namespace mods {
 			return header; // overwrite/load custom data
 		}
 
-		return db_find_xasset_header_hook.invoke<void*>(type, name, errorIfMissing, waitTime);
+		void* game_asset = db_find_xasset_header_hook.invoke<void*>(type, name, errorIfMissing, waitTime);
+
+		if (type == xassets::ASSET_TYPE_WEAPON)
+		{
+			game_asset = weapons::get_or_patch_weapon(game_asset);
+		}
+
+		return game_asset;
 	}
 
 	bool db_does_xasset_exist_stub(xassets::XAssetType type, game::BO4_AssetRef_t* name)
