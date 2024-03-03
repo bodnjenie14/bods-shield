@@ -7,7 +7,7 @@
 namespace dynamic_data
 {
 
-	void load_dd(rapidjson::Value& object, void* buffer, void* mask, field* fields, size_t field_count)
+	void dd_container::load_dd(rapidjson::Value& object, void* buffer, void* mask) const
 	{
 		if (!object.IsObject())
 		{
@@ -24,7 +24,7 @@ namespace dynamic_data
 			const char* key_val = key.GetString();
 			std::string_view key_v{ key_val };
 
-			field* field{};
+			const field* field{};
 
 			if (!key_v.rfind("unk_", 0))
 			{
@@ -70,8 +70,11 @@ namespace dynamic_data
 			memset((byte*)mask + field->offset, 0xFF, field->size);
 
 			byte* data = (byte*)buffer + field->offset;
-			auto handle_field_val = [key_val, field, data](const rapidjson::Value& val, size_t idx) {
-				switch (field->type)
+			const dynamic_data::dd_container& container = *this;
+			auto handle_field_val = [&container, key_val, field, data](const rapidjson::Value& val, size_t idx) {
+
+				auto [type, name] = get_named_type(field->type);
+				switch (type)
 				{
 				case FT_UINT:
 				{
@@ -185,12 +188,51 @@ namespace dynamic_data
 					*(uint64_t*)(data + 0x10 * idx) = hash;
 				}
 					break;
-				case FT_STRING:
 				case FT_ENUM:
+				{
+					if (!val.IsString())
+					{
+						throw std::runtime_error(utilities::string::va("field '%s' should be a string", key_val));
+					}
+					const char* enum_val_str = val.GetString();
+					uint64_t enum_val = fnv1a::generate_hash_const(enum_val_str);
+					auto it = std::find_if(container.enums, container.enums + container.enum_count, 
+						[name, enum_val](const dynamic_data::enum_type& et) { return et.type_name == name && et.field_name == enum_val; });
+
+					if (it == container.enums + container.enum_count)
+					{
+						throw std::runtime_error(utilities::string::va("unknown enum value for key '%s' = '%s'", key_val, enum_val_str));
+					}
+
+					int64_t u = it->value;
+
+					size_t len = field->size / field->array_size;
+					switch (len)
+					{
+					case 1:
+						*(int8_t*)(data + len * idx) = (int8_t)u;
+						break;
+					case 2:
+						*(int16_t*)(data + len * idx) = (int16_t)u;
+						break;
+					case 4:
+						*(int32_t*)(data + len * idx) = (int32_t)u;
+						break;
+					case 8:
+						*(int64_t*)(data + len * idx) = (int64_t)u;
+						break;
+					default:
+						assert(0 && "field definition with bad size");
+						break;
+					}
+
+				}
+					break;
+				case FT_STRING:
 					// todo
 				default:
 					assert(0 && "unknown field type");
-					return;
+					throw std::runtime_error(utilities::string::va("unknown field type for key '%s' %d", key_val, type));
 				}
 			};
 

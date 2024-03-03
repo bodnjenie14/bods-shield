@@ -17,15 +17,7 @@ namespace gsc_funcs
 {
 	uint32_t canon_hash(const char* str)
 	{
-		uint32_t hash = 0x4B9ACE2F;
-
-		for (const char* data = str; *data; data++)
-		{
-			char c = (char)tolower(*data);
-			hash = ((c + hash) ^ ((c + hash) << 10)) + (((c + hash) ^ ((c + hash) << 10)) >> 6);
-		}
-
-		uint32_t val = 0x8001 * ((9 * hash) ^ ((9 * hash) >> 11));
+		uint32_t val = canon_hash_const(str);
 
 		hashes::add_hash(val, str);
 

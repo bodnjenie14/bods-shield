@@ -128,7 +128,7 @@ namespace game_console
 			con.screen_max[1] = game::ScrPlace_GetView(0)->realViewportSize[1] - 6.0f;
 
 			con.font_height = static_cast<float>(game::UI_TextHeight(R_DrawTextFont, con.font_scale));
-			con.visible_line_count = static_cast<int>((con.screen_max[1] - con.screen_min[1] - (con.font_height * 2)) - 24.0f) / con.font_height;
+			con.visible_line_count = (int)(static_cast<int>((con.screen_max[1] - con.screen_min[1] - (con.font_height * 2)) - 24.0f) / con.font_height);
 		}
 
 		void draw_box(const float x, const float y, const float w, const float h, float* color)
