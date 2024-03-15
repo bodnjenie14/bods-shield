@@ -28,5 +28,6 @@ namespace gsc_custom
 	};
 
 	void sync_gsic(game::scriptInstance_t inst, gsic_info& info);
+	const gsic_detour* find_detour(game::scriptInstance_t inst, byte* startlocation);
 	void find_linking_issues();
 }

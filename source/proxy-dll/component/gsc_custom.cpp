@@ -211,6 +211,22 @@ namespace gsc_custom
 		inst_data.emplace_back(info);
 	}
 
+	const gsic_detour* find_detour(game::scriptInstance_t inst, byte* startlocation)
+	{
+		for (const auto& gsic : gsic_data[inst])
+		{
+			for (const auto& detour : gsic.gsic_info.detours)
+			{
+				if (detour.fixup_function == startlocation)
+				{
+					return &detour;
+				}
+			}
+		}
+
+		return nullptr;
+	}
+
 	void vm_op_custom_lazylink(game::scriptInstance_t inst, game::function_stack_t* fs_0, game::ScrVmContext_t* vmc, bool* terminate)
 	{
 		byte* base = align_ptr<uint32_t>(fs_0->pos);

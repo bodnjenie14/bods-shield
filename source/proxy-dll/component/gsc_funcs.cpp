@@ -11,6 +11,7 @@
 
 #include <utilities/hook.hpp>
 #include <utilities/io.hpp>
+#include <utilities/string.hpp>
 #include <utilities/json_config.hpp>
 
 namespace gsc_funcs
@@ -46,21 +47,6 @@ namespace gsc_funcs
 		va_end(va);
 
 		game::ScrVm_Error(game::runtime_errors::custom_error_id, inst, buffer[inst], terminal);
-	}
-
-	const char* lookup_hash(game::scriptInstance_t inst, const char* type, uint64_t hash)
-	{
-		static char buffer[game::SCRIPTINSTANCE_MAX][0x50];
-		const char* str = hashes::lookup(hash);
-
-		if (str)
-		{
-			return str;
-		}
-
-		sprintf_s(buffer[inst], "%s_%llx", type, hash);
-
-		return buffer[inst];
 	}
 
 	void ScrVm_AddToArrayIntIndexed(game::scriptInstance_t inst, uint64_t index)
@@ -189,7 +175,7 @@ namespace gsc_funcs
 			case game::TYPE_HASH:
 			{
 				game::BO4_AssetRef_t hash{};
-				logger::write(logger::LOG_TYPE_INFO, "[ %s VM ] %llx", inst ? "CSC" : "GSC", lookup_hash(inst, "hash", game::ScrVm_GetHash(&hash, inst, offset)->hash));
+				logger::write(logger::LOG_TYPE_INFO, "[ %s VM ] %llx", inst ? "CSC" : "GSC", hashes::lookup_tmp("hash", game::ScrVm_GetHash(&hash, inst, offset)->hash));
 			}
 				break;
 			case game::TYPE_INTEGER:
@@ -519,7 +505,7 @@ namespace gsc_funcs
 			}
 			else
 			{
-				gsc_error("compiler::%s not implemented", inst, false, lookup_hash(inst, "function", hash));
+				gsc_error("compiler::%s not implemented", inst, false, hashes::lookup_tmp("function", hash));
 			}
 		}
 
@@ -1486,7 +1472,7 @@ namespace gsc_funcs
 
 	void get_gsc_export_info(game::scriptInstance_t inst, byte* codepos, const char** scriptname, int32_t* sloc, int32_t* crc, int32_t* vm)
 	{
-		static char scriptnamebuffer[game::scriptInstance_t::SCRIPTINSTANCE_MAX][0x200];
+		static char scriptnamebuffer[game::scriptInstance_t::SCRIPTINSTANCE_MAX][0x300];
 		game::GSC_OBJ* script_obj = nullptr;
 		{
 			game::scoped_critical_section scs{ game::CRITSECT_GSC_OBJECTS, game::SCOPED_CRITSECT_NORMAL };
@@ -1535,12 +1521,31 @@ namespace gsc_funcs
 			{
 				if (export_item)
 				{
-					std::string script_name = lookup_hash(inst, "script", script_obj->name & 0x7FFFFFFFFFFFFFFF);
+					const gsc_custom::gsic_detour* detour = gsc_custom::find_detour(inst, script_obj->magic + export_item->address);
+					
+					if (detour)
+					{
+						sprintf_s(scriptnamebuffer[inst], "%s detour %s<%s>::%s@%x",
+							hashes::lookup_tmp("script", script_obj->name & 0x7FFFFFFFFFFFFFFF),
+							hashes::lookup_tmp("namespace", detour->replace_namespace),
+							hashes::lookup_tmp("script", detour->target_script & 0x7FFFFFFFFFFFFFFF),
+							hashes::lookup_tmp("function", detour->replace_function),
+							rloc - export_item->address
+						);
+					}
+					else {
+						const char* script_name = hashes::lookup_tmp("script", script_obj->name & 0x7FFFFFFFFFFFFFFF);
 
-					sprintf_s(scriptnamebuffer[inst], "%s::%s@%x", script_name.c_str(), lookup_hash(inst, "function", export_item->name), rloc - export_item->address);
+						sprintf_s(scriptnamebuffer[inst], "%s::%s@%x",
+							hashes::lookup_tmp("script", script_obj->name & 0x7FFFFFFFFFFFFFFF),
+							hashes::lookup_tmp("function", export_item->name),
+							rloc - export_item->address
+						);
+					}
+
 				} else
 				{
-					sprintf_s(scriptnamebuffer[inst], "%s", lookup_hash(inst, "script", script_obj->name & 0x7FFFFFFFFFFFFFFF));
+					sprintf_s(scriptnamebuffer[inst], "%s", hashes::lookup_tmp("script", script_obj->name & 0x7FFFFFFFFFFFFFFF));
 				}
 
 				*scriptname = scriptnamebuffer[inst];
