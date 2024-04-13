@@ -2,6 +2,7 @@
 #include "loader/component_loader.hpp"
 #include "definitions/game.hpp"
 #include "definitions/variables.hpp"
+#include "command.hpp"
 
 #include <utilities/hook.hpp>
 #include <utilities/json_config.hpp>
@@ -10,6 +11,65 @@ namespace unlockall
 {
 	namespace
 	{
+		struct unlock_all_s
+		{
+            bool all = false;
+            bool loot = false;
+            bool items = false;
+            bool attachments = false;
+            bool emblems = false;
+            bool challenges = false;
+            bool classes = false;
+        };
+
+        class UnlockController
+        {
+        private:
+            std::unordered_map<std::string, bool unlock_all_s::*> mapping = {
+                {"all", &unlock_all_s::all},
+                {"loot", &unlock_all_s::loot},
+                {"items", &unlock_all_s::items},
+                {"attachments", &unlock_all_s::attachments},
+                {"emblems", &unlock_all_s::emblems},
+                {"challenges", &unlock_all_s::challenges},
+                {"classes", &unlock_all_s::classes}};
+            unlock_all_s unlock;
+
+        public:
+            void changeValue(const std::string& name, bool value)
+            {
+                auto it = mapping.find(name);
+                if (it != mapping.end())
+                {
+                    unlock.*(it->second) = value;
+                }
+            }
+
+            bool getValue(const std::string& name)
+            {
+                auto it = mapping.find(name);
+                if (it != mapping.end())
+                {
+                    return unlock.*(it->second);
+                }
+                return false;
+            }
+        };
+
+		UnlockController unlock;
+
+        // unlock_all_s unlock;
+
+		utilities::hook::detour loot_getitemquantity_hook;
+		utilities::hook::detour bg_unlockablesisitemattachmentlocked_hook;
+		utilities::hook::detour bg_unlockablesisattachmentslotlocked_hook;
+		utilities::hook::detour bg_unlockablesemblemorbackinglockedbychallenge_hook;
+		utilities::hook::detour bg_unlockablesitemoptionlocked_hook;
+		utilities::hook::detour bg_unlockedgetchallengeunlockedforindex_hook;
+		utilities::hook::detour bg_emblemisentitlementbackgroundgranted_hook;
+		utilities::hook::detour bg_unlockablesgetcustomclasscount_hook;
+		utilities::hook::detour bg_unlockablesisitemlocked_hook;
+
 		uint32_t zm_loot_table[] =
 		{
 			1000001,			// zm_bgb_ctrl_z
@@ -93,71 +153,133 @@ namespace unlockall
 			return false;
 		}
 
-		int liveinventory_getitemquantity(int controller_index, int item_id)
+		int liveinventory_getitemquantity(const game::ControllerIndex_t controllerIndex, const int item_id)
 		{
-			int result = is_zm_loot(item_id) ? 999 : 1;
-
-			return result;
+			if (unlock.getValue("all") || unlock.getValue("items"))
+            {
+				int result = is_zm_loot(item_id) ? 999 : 1;
+				return result;
+            }
+			return loot_getitemquantity_hook.invoke<int>(controllerIndex, item_id);
 		}
 
-		bool bg_unlockedgetchallengeunlockedforindex(game::eModes mode, int32_t controller, uint16_t index, int32_t itemIndex)
+		bool bg_unlockedgetchallengeunlockedforindex(game::eModes mode, const game::ControllerIndex_t controllerIndex, uint16_t index, int32_t itemIndex)
 		{
-			return true;
+            if (unlock.getValue("all") || unlock.getValue("challenges"))
+            {
+                return true;
+            }
+			bg_unlockedgetchallengeunlockedforindex_hook.invoke<bool>(mode, controllerIndex, index, itemIndex);
 		}
 
-		bool bg_unlockablesitemoptionlocked(game::eModes mode, int32_t controller, int itemIndex, int32_t optionIndex)
+		bool bg_unlockablesitemoptionlocked(game::eModes mode, const game::ControllerIndex_t controllerIndex, int itemIndex, int32_t optionIndex)
 		{
-			return false;
+            if (unlock.getValue("all") || unlock.getValue("items"))
+            {
+                return false;
+            }
+			return bg_unlockablesitemoptionlocked_hook.invoke<bool>(mode, controllerIndex, itemIndex, optionIndex);
 		}
 
-		bool bg_unlockablesisitemattachmentlocked(game::eModes mode, int32_t controller, int32_t itemIndex, int32_t attachmentNum)
+        bool bg_unlockablesisitemattachmentlocked(game::eModes mode, const game::ControllerIndex_t controllerIndex, int32_t itemIndex, int32_t attachmentNum)
+        {
+            if (unlock.getValue("all") || unlock.getValue("attachments"))
+            {
+                return false;
+            }
+            return bg_unlockablesisitemattachmentlocked_hook.invoke<bool>(mode, controllerIndex, itemIndex, attachmentNum);
+        }
+
+        bool bg_unlockablesisattachmentslotlocked(game::eModes mode, const game::ControllerIndex_t controllerIndex, int32_t itemIndex, int32_t attachmentSlotIndex)
 		{
-			return false;
+			if (unlock.getValue("all") || unlock.getValue("attachments"))
+            {
+                return false;
+            }
+			return bg_unlockablesisattachmentslotlocked_hook.invoke<bool>(mode, controllerIndex, itemIndex, attachmentSlotIndex);
 		}
 
-		bool bg_unlockablesisattachmentslotlocked(game::eModes mode, int32_t controller, int32_t itemIndex, int32_t attachmentSlotIndex)
+		bool bg_unlockablesemblemorbackinglockedbychallenge(game::eModes mode, const game::ControllerIndex_t controllerIndex, void* challengeLookup, bool otherPlayer)
 		{
-			return false;
+			if (unlock.getValue("all") || unlock.getValue("emblems"))
+            {
+                return false;
+            }
+			return bg_unlockablesemblemorbackinglockedbychallenge_hook.invoke<bool>(mode, controllerIndex, challengeLookup, otherPlayer);
 		}
 
-		bool bg_unlockablesemblemorbackinglockedbychallenge(game::eModes mode, int32_t controller, void* challengeLookup, bool otherPlayer)
+		bool bg_emblemisentitlementbackgroundgranted(const game::ControllerIndex_t controllerIndex, uint16_t backgroundId)
 		{
-			return false;
+			if (unlock.getValue("all") || unlock.getValue("emblems"))
+            {
+                return true;
+            }
+			return bg_emblemisentitlementbackgroundgranted_hook.invoke<bool>(controllerIndex, backgroundId);
 		}
 
-		bool bg_emblemisentitlementbackgroundgranted(int32_t controller, uint16_t backgroundId)
+		bool bg_unlockablesisitemlocked(game::eModes mode, const game::ControllerIndex_t controllerIndex, int32_t itemIndex)
 		{
-			return true;
+			if (unlock.getValue("all") || unlock.getValue("items"))
+            {
+                return false;
+            }
+			return bg_unlockablesisitemlocked_hook.invoke<bool>(mode, controllerIndex, itemIndex);
+
 		}
 
-		bool bg_unlockablesisitemlocked(game::eModes mode, int32_t controller, int32_t itemIndex)
+		int32_t bg_unlockablesgetcustomclasscount(game::eModes mode, const game::ControllerIndex_t controllerIndex)
 		{
-			return false;
+			if (unlock.getValue("all") || unlock.getValue("classes"))
+            {
+                return 12; // max 12
+            }
+			return bg_unlockablesgetcustomclasscount_hook.invoke<int>(mode, controllerIndex);
 		}
 
-		int32_t bg_unlockablesgetcustomclasscount(game::eModes mode, int32_t controller)
-		{
-			return 12; // max is 12
-		}
+		void unlock_func(const command::params& params)
+        {
+            if (params.size() < 2) return;
+
+            std::string arg1 = params[1];
+
+            if (params.size() == 3)
+            {
+                std::string arg2 = params[2];
+                bool TF = (arg2 == "true" || arg2 == "True" || arg2 == "1");
+                unlock.changeValue(arg1, TF);
+            }
+            else
+            {
+                unlock.changeValue(arg1, true);
+            }
+        }
 	}
 
-	class component final : public component_interface
+    class component final : public component_interface
 	{
 	public:
 		void post_unpack() override
 		{
-			utilities::hook::jump(0x1437F6ED0_g, liveinventory_getitemquantity);
-
-			utilities::hook::jump(0x1406BB410_g, bg_unlockedgetchallengeunlockedforindex);
-			utilities::hook::jump(0x1406B5530_g, bg_unlockablesitemoptionlocked);
-			utilities::hook::jump(0x1406B34D0_g, bg_unlockablesisitemattachmentlocked);
-			utilities::hook::jump(0x1406B3290_g, bg_unlockablesisattachmentslotlocked);
-			utilities::hook::jump(0x1406AC010_g, bg_unlockablesemblemorbackinglockedbychallenge);
-			utilities::hook::jump(0x144184D20_g, bg_emblemisentitlementbackgroundgranted);
-			utilities::hook::jump(0x1406B3AA0_g, bg_unlockablesisitemlocked);
-			utilities::hook::jump(0x1406ae060_g, bg_unlockablesgetcustomclasscount);
-		}
-	};
+			command::add("unlock", [&](const command::params& params){unlock_func(params);});
+			unlock.changeValue("all", utilities::json_config::ReadBoolean("unlock", "all", false));
+			unlock.changeValue("loot", utilities::json_config::ReadBoolean("unlock", "loot", false));
+			unlock.changeValue("items", utilities::json_config::ReadBoolean("unlock", "items", false));
+			unlock.changeValue("attachments", utilities::json_config::ReadBoolean("unlock", "attachments", false));
+			unlock.changeValue("emblems", utilities::json_config::ReadBoolean("unlock", "emblems", false));
+			unlock.changeValue("challenges", utilities::json_config::ReadBoolean("unlock", "challenges", false));
+			unlock.changeValue("classes", utilities::json_config::ReadBoolean("unlock", "classes", false));
+			
+			loot_getitemquantity_hook.create(0x1437F6ED0_g, liveinventory_getitemquantity);
+			bg_unlockablesisitemattachmentlocked_hook.create(0x1406B34D0_g, bg_unlockablesisitemattachmentlocked);
+			bg_unlockablesisattachmentslotlocked_hook.create(0x1406B3290_g, bg_unlockablesisattachmentslotlocked);
+			bg_unlockablesemblemorbackinglockedbychallenge_hook.create(0x1406AC010_g, bg_unlockablesemblemorbackinglockedbychallenge);
+			bg_unlockablesitemoptionlocked_hook.create(0x1406B5530_g, bg_unlockablesitemoptionlocked);
+			bg_unlockedgetchallengeunlockedforindex_hook.create(0x1406BB410_g, bg_unlockedgetchallengeunlockedforindex);
+			bg_emblemisentitlementbackgroundgranted_hook.create(0x144184D20_g, bg_emblemisentitlementbackgroundgranted);
+			bg_unlockablesgetcustomclasscount_hook.create(0x1406ae060_g, bg_unlockablesgetcustomclasscount);
+			bg_unlockablesisitemlocked_hook.create(0x1406B3AA0_g, bg_unlockablesisitemlocked);
+        }
+    };
 }
 
 REGISTER_COMPONENT(unlockall::component)

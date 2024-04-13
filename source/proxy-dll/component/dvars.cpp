@@ -5,6 +5,7 @@
 #include "definitions/variables.hpp"
 #include "loader/component_loader.hpp"
 
+#include <utilities/hook.hpp>
 #include <utilities/string.hpp>
 
 namespace dvars
@@ -275,6 +276,19 @@ namespace dvars
 		return spoofcall::invoke<game::dvar_t*>(game::Dvar_FindVar, nameRef.data());
 	}
 
+	utilities::hook::detour dvar_setfromstringbynamefromsource_hook;
+
+	game::dvar_t* dvar_setfromstringbynamefromsource_stub(const char* name, const char* string, game::dvarSource source, uint32_t flags, bool create_if_missing)
+	{
+		game::BO4_AssetRef_t hash{};
+
+		if (name && *name)
+		{
+			hash.hash = (int64_t)fnv1a::generate_hash_pattern(name);
+		}
+
+		return game::Dvar_SetFromStringByNameFromSourceHashed(&hash, string, source, flags, create_if_missing);
+	}
 
 	class component final : public component_interface
 	{
@@ -282,6 +296,7 @@ namespace dvars
 		void post_unpack() override
 		{
 			scheduler::once(fetch_dvar_pointers, scheduler::pipeline::main);
+			dvar_setfromstringbynamefromsource_hook.create(0x143CF4A10_g, dvar_setfromstringbynamefromsource_stub);
 		}
 	};
 }

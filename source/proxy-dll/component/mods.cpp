@@ -8,6 +8,7 @@
 #include "gsc_custom.hpp"
 #include "dvars.hpp"
 #include "hashes.hpp"
+#include "weapons.hpp"
 
 #include "loader/component_loader.hpp"
 #include <utilities/io.hpp>
@@ -20,7 +21,8 @@ namespace mods {
 	constexpr const char* gsic_magic = "GSIC";
 
 	constexpr const char* mod_metadata_file = "metadata.json";
-	std::filesystem::path mod_dir = "project-bo4/mods";
+	std::filesystem::path user_mod_dir = "project-bo4/mods";
+	std::filesystem::path shield_mod_dir = "project-bo4/internals";
 
 	namespace {
 		struct raw_file
@@ -200,10 +202,36 @@ namespace mods {
 			std::unordered_set<uint64_t> hooks_gametype{};
 		};
 
+		struct combined_bg_cache
+		{
+			xassets::bg_cache_info custom_cache
+			{
+				.name
+				{
+					.hash = (int64_t)fnv1a::generate_hash("shield_cache") // 2c4f76fcf5cfbebd
+				}
+			};
+			std::vector<xassets::bg_cache_info_def> custom_cache_entries{};
+
+			void start_sync()
+			{
+				custom_cache.defCount = 0;
+				custom_cache.def = nullptr;
+				custom_cache_entries.clear();
+			}
+
+			void end_sync()
+			{
+				custom_cache.def = custom_cache_entries.data();
+				custom_cache.defCount = (int)custom_cache_entries.size();
+			}
+
+		};
 
 		class mod_storage
 		{
 		public:
+			const std::filesystem::path mod_dir;
 			std::mutex load_mutex{};
 			std::vector<char*> allocated_strings{};
 			std::vector<scriptparsetree> gsc_files{};
@@ -213,21 +241,32 @@ namespace mods {
 			std::vector<localize> localizes{};
 			std::vector<cache_entry> cache_entries{};
 			std::unordered_map<int64_t, int64_t> assets_redirects[xassets::ASSET_TYPE_COUNT] = {};
-			std::vector<xassets::bg_cache_info_def> custom_cache_entries{};
 
-			xassets::bg_cache_info custom_cache
+			mod_storage(const std::filesystem::path& mod_dir) : mod_dir(mod_dir)
 			{
-				.name
-				{
-					.hash = (int64_t)fnv1a::generate_hash("shield_cache") // 2c4f76fcf5cfbebd
-				}
-			};
+
+			}
 
 			~mod_storage()
 			{
 				for (char* str : allocated_strings)
 				{
 					delete str;
+				}
+			}
+
+			void redirect_xasset(xassets::XAssetType type, game::BO4_AssetRef_t& hash)
+			{
+				auto& redirect = assets_redirects[type];
+
+				auto replaced = redirect.find(hash.hash & 0x7FFFFFFFFFFFFFFF);
+
+
+				if (replaced != redirect.end())
+				{
+					// replace xasset
+					hash.hash = replaced->second;
+					hash.null = 0;
 				}
 			}
 
@@ -240,6 +279,7 @@ namespace mods {
 				csv_files.clear();
 				localizes.clear();
 				cache_entries.clear();
+				weapons::clear_weapon_defs();
 
 				for (auto& redirect : assets_redirects)
 				{
@@ -263,12 +303,9 @@ namespace mods {
 				return str;
 			}
 
-			void sync_cache_entries()
+			void sync_cache_entries(combined_bg_cache& cache)
 			{
 				std::lock_guard lg{ load_mutex };
-				custom_cache.defCount = 0;
-				custom_cache.def = nullptr;
-				custom_cache_entries.clear();
 
 				if (!cache_entries.size())
 				{
@@ -300,15 +337,12 @@ namespace mods {
 						|| entry.hooks_gametype.find(gametype_hash) != entry.hooks_gametype.end()
 						)
 					{
-						auto& ref = custom_cache_entries.emplace_back();
+						auto& ref = cache.custom_cache_entries.emplace_back();
 						ref.type = entry.type;
 						ref.name.hash = entry.name.hash;
 						count++;
 					}
 				}
-				custom_cache.def = custom_cache_entries.data();
-				custom_cache.defCount = (int)custom_cache_entries.size();
-				logger::write(logger::LOG_TYPE_DEBUG, "sync %d custom bgcache entries", count);
 			}
 
 			void* get_xasset(xassets::XAssetType type, uint64_t name)
@@ -356,6 +390,8 @@ namespace mods {
 
 					return it->get_header();
 				}
+				case xassets::ASSET_TYPE_WEAPON:
+					return weapons::get_weapon_asset(name);
 				default:
 					return nullptr; // unknown resource type
 				}
@@ -776,6 +812,10 @@ namespace mods {
 
 					return hashes::load_file(path, format);
 				}
+				else if (!_strcmpi("weapon", type_val))
+				{
+					return weapons::load_weapon_def(member, mod_name, mod_path);
+				}
 				else
 				{
 					logger::write(logger::LOG_TYPE_ERROR, std::format("mod {} is load data member with an unknown type '{}'", mod_name, type_val));
@@ -1091,7 +1131,9 @@ namespace mods {
 			}
 		};
 
-		mod_storage storage{};
+		mod_storage storage{ user_mod_dir };
+		mod_storage shield_storage{ shield_mod_dir };
+		combined_bg_cache bg_cache{};
 
 
 		void load_mods_cmd()
@@ -1121,56 +1163,58 @@ namespace mods {
 
 	void* db_find_xasset_header_stub(xassets::XAssetType type, game::BO4_AssetRef_t* name, bool errorIfMissing, int waitTime)
 	{
-		auto& redirect = storage.assets_redirects[type];
+		game::BO4_AssetRef_t redirected_name = *name;
 
-		auto replaced = redirect.find(name->hash & 0x7FFFFFFFFFFFFFFF);
+		shield_storage.redirect_xasset(type, redirected_name);
+		storage.redirect_xasset(type, redirected_name);
 
-		game::BO4_AssetRef_t redirected_name;
-		if (replaced != redirect.end())
-		{
-			// replace xasset
-			redirected_name.hash = replaced->second;
-			redirected_name.null = 0;
-			name = &redirected_name;
-		}
-
-		void* header = storage.get_xasset(type, name->hash);
+		void* header = storage.get_xasset(type, redirected_name.hash);
 
 		if (header)
 		{
 			return header; // overwrite/load custom data
 		}
 
-		return db_find_xasset_header_hook.invoke<void*>(type, name, errorIfMissing, waitTime);
+		// we need to run it after the mods container to allow overwrites
+		void* shield_header = shield_storage.get_xasset(type, redirected_name.hash);
+
+		if (shield_header)
+		{
+			return shield_header; // overwrite/load custom data from shield
+		}
+
+		void* game_asset = db_find_xasset_header_hook.invoke<void*>(type, &redirected_name, errorIfMissing, waitTime);
+
+		if (type == xassets::ASSET_TYPE_WEAPON)
+		{
+			game_asset = weapons::get_or_patch_weapon(game_asset);
+		}
+
+		return game_asset;
 	}
 
 	bool db_does_xasset_exist_stub(xassets::XAssetType type, game::BO4_AssetRef_t* name)
 	{
-		auto& redirect = storage.assets_redirects[type];
+		game::BO4_AssetRef_t redirected_name = *name;
 
-		auto replaced = redirect.find(name->hash & 0x7FFFFFFFFFFFFFFF);
+		shield_storage.redirect_xasset(type, redirected_name);
+		storage.redirect_xasset(type, redirected_name);
 
-		game::BO4_AssetRef_t redirected_name;
-		if (replaced != redirect.end())
-		{
-			// replace xasset
-			redirected_name.hash = replaced->second;
-			redirected_name.null = 0;
-			name = &redirected_name;
-		}
-
-		void* header = storage.get_xasset(type, name->hash);
-
-		if (header)
+		if (storage.get_xasset(type, redirected_name.hash) || shield_storage.get_xasset(type, redirected_name.hash))
 		{
 			return true;
 		}
 
-		return db_does_xasset_exist_hook.invoke<bool>(type, name);
+		return db_does_xasset_exist_hook.invoke<bool>(type, &redirected_name);
 	}
 
 	int scr_gsc_obj_link_stub(game::scriptInstance_t inst, game::GSC_OBJ* prime_obj, bool runScript)
 	{
+		if (!prime_obj)
+		{
+			return scr_gsc_obj_link_hook.invoke<int>(inst, prime_obj, runScript); // bad script
+		}
+
 		// link the injected scripts if we find a hook, sync the gsic fields at the same time 
 		// because we know the instance.
 		for (auto& spt : storage.gsc_files)
@@ -1186,14 +1230,35 @@ namespace mods {
 				}
 			}
 		}
+		for (auto& spt : shield_storage.gsc_files)
+		{
+			if (spt.hooks.find(prime_obj->name) != spt.hooks.end())
+			{
+				gsc_custom::sync_gsic(inst, spt.gsic);
+				int err = scr_gsc_obj_link_hook.invoke<int>(inst, spt.get_header()->buffer, runScript);
+
+				if (err < 0)
+				{
+					return err; // error when linking
+				}
+			}
+		}
 
 		auto custom_replaced_it = std::find_if(storage.gsc_files.begin(), storage.gsc_files.end(),
-			[prime_obj](scriptparsetree& e){ return e.get_header()->buffer == prime_obj; });
+			[prime_obj](scriptparsetree& e) { return e.get_header()->buffer == prime_obj; });
 
 		if (custom_replaced_it != storage.gsc_files.end())
 		{
 			// replaced gsc file
 			gsc_custom::sync_gsic(inst, custom_replaced_it->gsic);
+		}
+
+		auto shield_custom_replaced_it = std::find_if(shield_storage.gsc_files.begin(), shield_storage.gsc_files.end(),
+			[prime_obj](scriptparsetree& e) { return e.get_header()->buffer == prime_obj; });
+
+		if (shield_custom_replaced_it != shield_storage.gsc_files.end())
+		{
+			gsc_custom::sync_gsic(inst, shield_custom_replaced_it->gsic);
 		}
 
 		return scr_gsc_obj_link_hook.invoke<int>(inst, prime_obj, runScript);
@@ -1203,39 +1268,57 @@ namespace mods {
 	{
 
 		uint64_t hash{};
-		if (!storage.lua_files.empty())
+		if (!storage.lua_files.empty() || !shield_storage.lua_files.empty())
 		{
 			hash = fnv1a::generate_hash_pattern(filename);
 		}
 
-		for (auto& lua : storage.lua_files)
-		{
-			// we need to use the hash because filename is x64:HASH or unhashed
-
-			if (lua.hooks.find(hash) != lua.hooks.end())
+		auto load_lua = [hash, state](lua_file& lua, bool post)
 			{
-				std::string name = std::format("x64:{:x}.lua", lua.noext_name);
-				if (!game::Lua_CoD_LoadLuaFile(state, name.c_str()))
+				// we need to use the hash because filename is x64:HASH or unhashed
+
+				bool find;
+				if (post)
 				{
-					logger::write(logger::LOG_TYPE_ERROR, std::format("error when loading hook lua {} (pre)", name));
+					find = lua.hooks.find(hash) != lua.hooks.end();
 				}
-			}
+				else
+				{
+					find = lua.hooks_post.find(hash) != lua.hooks_post.end();
+				}
+
+				if (find)
+				{
+					std::string name = std::format("x64:{:x}.lua", lua.noext_name);
+					if (!game::Lua_CoD_LoadLuaFile(state, name.c_str()))
+					{
+						logger::write(logger::LOG_TYPE_ERROR, std::format("error when loading hook lua {} ({})", name, post ? "post" : "pre"));
+					}
+					else
+					{
+						logger::write(logger::LOG_TYPE_DEBUG, std::format("loaded hook lua {} ({})", name, post ? "post" : "pre"));
+					}
+				}
+			};
+
+		for (lua_file& lua : shield_storage.lua_files)
+		{
+			load_lua(lua, false);
+		}
+		for (lua_file& lua : storage.lua_files)
+		{
+			load_lua(lua, false);
 		}
 
 		int load = hksl_loadfile_hook.invoke<int>(state, filename);
 
-		for (auto& lua : storage.lua_files)
+		for (lua_file& lua : shield_storage.lua_files)
 		{
-			// we need to use the hash because filename is x64:HASH or unhashed
-
-			if (lua.hooks_post.find(hash) != lua.hooks_post.end())
-			{
-				std::string name = std::format("x64:{:x}.lua", lua.noext_name);
-				if (!game::Lua_CoD_LoadLuaFile(state, name.c_str()))
-				{
-					logger::write(logger::LOG_TYPE_ERROR, std::format("error when loading hook lua {} (post)", name));
-				}
-			}
+			load_lua(lua, true);
+		}
+		for (lua_file& lua : storage.lua_files)
+		{
+			load_lua(lua, true);
 		}
 
 		return load;
@@ -1245,9 +1328,15 @@ namespace mods {
 
 	void bg_cache_sync_stub()
 	{
-		storage.sync_cache_entries();
+		bg_cache.start_sync();
 
-		xassets::Demo_AddBGCacheAndRegister(&storage.custom_cache, 0x16000); 
+		storage.sync_cache_entries(bg_cache);
+		shield_storage.sync_cache_entries(bg_cache);
+
+		bg_cache.end_sync();
+		logger::write(logger::LOG_TYPE_DEBUG, "sync %d custom bgcache entries", bg_cache.custom_cache.defCount);
+
+		xassets::Demo_AddBGCacheAndRegister(&bg_cache.custom_cache, 0x16000);
 		
 		// sync default
 		bg_cache_sync_hook.invoke<void>();
@@ -1259,6 +1348,7 @@ namespace mods {
 		void post_unpack() override
 		{
 			storage.load_mods();
+			shield_storage.load_mods();
 
 			// custom assets loading
 			db_find_xasset_header_hook.create(xassets::DB_FindXAssetHeader.get(), db_find_xasset_header_stub);
