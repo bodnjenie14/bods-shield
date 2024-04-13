@@ -25,6 +25,7 @@ namespace gsc_custom
 			return reinterpret_cast<byte*>((reinterpret_cast<uintptr_t>(ptr) + sizeof(T) - 1) & ~(sizeof(T) - 1));
 		}
 
+		byte* lastopcode[game::scriptInstance_t::SCRIPTINSTANCE_MAX]{};
 		std::vector<gsic_link_detour_data> gsic_data[game::SCRIPTINSTANCE_MAX]{ {}, {} };
 
 		byte* find_export(game::scriptInstance_t inst, uint64_t target_script, uint32_t name_space, uint32_t name)
@@ -503,14 +504,54 @@ namespace gsc_custom
 		gsc_funcs::gsc_error("GSC Linking error, see logs for more details", game::SCRIPTINSTANCE_SERVER, true);
 	}
 
-	void patch_linking_sys_error()
+	void patch_vm()
 	{
+		// linking_sys_error
+
 		auto scr_get_gsc_obj = 0x142748BB0_g;
 
 		// skip the error and the autoexec
 		// 1C1 = syserr start
 		// 19F = end
 		utilities::hook::jump(scr_get_gsc_obj + 0x1C1, scr_get_gsc_obj + 0x19F);
+
+
+		// write last opcode location
+
+		auto scrvm_execute = 0x1427709E0_g;
+
+		// 1D2 : opcode = *(unsigned __int16 *)base;
+		// 1D5 : fs0->pos = base + 2
+		// 1DC : end
+
+		void* stub = utilities::hook::assemble([scrvm_execute](utilities::hook::assembler& as)
+			{
+				// opcode = *(unsigned __int16 *)base;
+				as.movzx(edi, word_ptr(rax));
+
+				// store op
+				as.push(rbx);
+
+				as.mov(rbx, &lastopcode[0]);
+				// base = rax
+				// inst = rsi
+				as.mov(qword_ptr(rbx, rsi), rax);
+
+				as.pop(rbx);
+
+				// fs0->pos = base + 2
+				as.add(rax, 2);
+				as.mov(ptr(rbx), rax);
+
+				as.jmp(scrvm_execute + 0x1DC);
+			});
+
+		utilities::hook::jump(scrvm_execute + 0x1D2, stub);
+	}
+
+	byte* get_last_opbase(game::scriptInstance_t inst)
+	{
+		return lastopcode[inst];
 	}
 
 	utilities::hook::detour scr_get_gsc_obj_hook;
@@ -539,7 +580,7 @@ namespace gsc_custom
 			// group gsc link
 			scr_get_gsc_obj_hook.create(0x142748BB0_g, scr_get_gsc_obj_stub);
 
-			patch_linking_sys_error();
+			patch_vm();
 		}
 	};
 }

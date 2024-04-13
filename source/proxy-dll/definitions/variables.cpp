@@ -5327,6 +5327,10 @@ namespace variables
 			"reload_mods",
 			"Reload the shield mods"
 		),
+		create_var_record(
+			"hash_var",
+			"Hash and print a variable, Usage: hash_var <var>"
+		),
 	};
 
 	std::vector<const char*> get_dvars_list()

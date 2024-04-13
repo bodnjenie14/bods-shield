@@ -68,7 +68,7 @@ namespace hashes
 			return val;
 		}
 
-		return utilities::string::va("s_%llx", type, hash);
+		return utilities::string::va("%s_%llx", type, hash);
 	}
 
 	void add_hash(uint64_t hash, const char* value)

@@ -700,6 +700,36 @@ namespace game_console
 		cl_char_event_hook.invoke<void>(localClientNum, key, isRepeated);
 	}
 
+	void hash_var()
+	{
+		game::CmdArgs* args = game::Sys_GetTLS()->cmdArgs;
+
+		if (args->argc[args->nesting] < 2)
+		{
+			logger::write(logger::LOG_TYPE_ERROR, "%s [var]+", args->argv[args->nesting][0]);
+			return;
+		}
+
+		for (size_t i = 1; i < args->argc[args->nesting]; i++)
+		{
+			const char* varname = args->argv[args->nesting][i];
+
+			uint64_t varhash = fnv1a::generate_hash_pattern(varname);
+
+			auto* const dvar = dvars::find_dvar(varhash);
+
+			if (!dvar)
+			{
+				logger::write(logger::LOG_TYPE_ERROR, "Can't find var %s", varname);
+				continue;
+			}
+
+			std::string varstr = dvars::get_value_string(dvar, &dvar->value->current);
+			logger::write(logger::LOG_TYPE_INFO, "=== %s ===", varname);
+			logger::write(logger::LOG_TYPE_INFO, varstr);
+			logger::write(logger::LOG_TYPE_INFO, dvars::get_domain_string(dvar->type, dvar->domain));
+		}
+	}
 
 	class component final : public component_interface
 	{
@@ -727,6 +757,9 @@ namespace game_console
 
 			con.font_scale = 0.38f;
 			con.max_suggestions = 24;
+
+			// hash and print a variable, todo later by replacing the hash functions of the console
+			Cmd_AddCommand("hash_var", hash_var);
 		}
 	};
 }

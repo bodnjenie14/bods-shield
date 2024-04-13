@@ -356,6 +356,32 @@ namespace game
 		uint32_t groupId;
 	};
 
+	struct CmdArgs
+	{
+		int nesting;
+		int localClientNum[8];
+		int controllerIndex[8];
+		int argshift[8];
+		int argc[8];
+		const char** argv[8];
+		char textPool[8192];
+		const char* argvPool[512];
+		int usedTextPool[8];
+		int totalUsedArgvPool;
+		int totalUsedTextPool;
+	};
+
+
+	struct TLSData
+	{
+		void* vaInfo; // va_info_t
+		void* errorJmpBuf; // jmp_buf
+		void* traceInfo; // TraceThreadInfo
+		CmdArgs* cmdArgs;
+		void* errorData; // ErrorThreadLocal
+	};
+
+
 	enum keyNum_t
 	{
 		K_NONE = 0x00,
@@ -860,6 +886,26 @@ namespace game
 		~scoped_critical_section();
 	};
 
+	enum hks_type : uint32_t
+	{
+		HKST_TNIL = 0x0,
+		HKST_TBOOLEAN = 0x1,
+		HKST_TLIGHTUSERDATA = 0x2,
+		HKST_TNUMBER = 0x3,
+		HKST_TSTRING = 0x4,
+		HKST_TTABLE = 0x5,
+		HKST_TFUNCTION = 0x6,
+		HKST_TUSERDATA = 0x7,
+		HKST_TTHREAD = 0x8,
+		HKST_TIFUNCTION = 0x9,
+		HKST_TCFUNCTION = 0xA,
+		HKST_TUI64 = 0xB,
+		HKST_TSTRUCT = 0xC,
+		HKST_TXHASH = 0xD,
+		HKST_COUNT = 0xE,
+	};
+
+
 	struct hks_global {};
 	struct hks_callstack
 	{
@@ -875,7 +921,7 @@ namespace game
 	struct lua_state;
 	struct hks_object
 	{
-		uint32_t t;
+		hks_type t;
 		union {
 			void* ptr;
 			float number;
@@ -1024,6 +1070,7 @@ namespace game
 	WEAK symbol<BO4_scrVarPub> scrVarPub{ 0x148307880_g };
 	WEAK symbol<BO4_scrVarGlob> scrVarGlob{ 0x148307830_g };
 	WEAK symbol<BO4_scrVmPub> scrVmPub{ 0x148307AA0_g };
+	WEAK symbol<byte> mt_buffer{ 0x147DAFC20_g };
 
 	WEAK symbol<VM_OP_FUNC> gVmOpJumpTable{ 0x144EED340_g };
 	WEAK symbol<uint32_t> gObjFileInfoCount{ 0x1482F76B0_g };
@@ -1035,13 +1082,15 @@ namespace game
 	WEAK symbol<const char*(lua_state* luaVM, hks_object* obj, size_t* len)> hks_obj_tolstring{ 0x143755730_g };
 	WEAK symbol<float(lua_state* luaVM, const hks_object* obj)> hks_obj_tonumber{ 0x143755A90_g };
 	WEAK symbol<const char*> hks_typename{ 0x1455B2360_g };
+	WEAK symbol<void(lua_state* luaVm, int index, const char* k)> hksi_lua_setfield{0x1422C8E80_g};
 	
 	// console labels
 	WEAK symbol<const char*> builtinLabels{ 0x144F11530_g };
 	// gsc types
 	WEAK symbol<const char*> var_typename{ 0x144EED240_g };
 
-	WEAK symbol<void(BO4_AssetRef_t* cmdName, xcommand_t function, cmd_function_t* allocedCmd)> Cmd_AddCommandInternal{0x143CDEE80_g};
+	WEAK symbol<void(BO4_AssetRef_t* cmdName, xcommand_t function, cmd_function_t* allocedCmd)> Cmd_AddCommandInternal{ 0x143CDEE80_g };
+	WEAK symbol<TLSData*()> Sys_GetTLS{ 0x143C56140_g };
 
 #define Cmd_AddCommand(name, function) \
     static game::cmd_function_t __cmd_func_##function;  \

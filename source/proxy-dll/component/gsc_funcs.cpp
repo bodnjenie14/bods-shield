@@ -1262,10 +1262,52 @@ namespace gsc_funcs
 				game::R_AddCmdDrawText(text, 0x7FFFFFFF, font, rx, ry, elem.scale, elem.scale, 0.0f, elem.color, 0);
 			}
 		}
+
+		const char* get_scrvar_type_name(game::ScrVarType_t type)
+		{
+			static const char* names[]
+			{
+				"undefined",
+				"pointer",
+				"string",
+				"vector",
+				"hash",
+				"float",
+				"integer",
+				"uintptr",
+				"entity_offset",
+				"codepos",
+				"precodepos",
+				"api_function",
+				"script_function",
+				"stack",
+				"thread",
+				"notify_thread",
+				"time_thread",
+				"frame_thread",
+				"child_thread",
+				"class",
+				"shared_struct",
+				"struct",
+				"removed_entity",
+				"entity",
+				"array",
+				"removed_thread",
+				"free",
+				"thread_list",
+				"ent_list",
+			};
+			if (type >= 0 && type < ARRAYSIZE(names))
+			{
+				return names[type];
+			}
+			return utilities::string::va("invalid_%x", type);
+		}
 	}
 
 
 	bool enable_dev_func = false;
+	bool enable_stack_dump = false;
 
 	utilities::hook::detour scr_get_function_reverse_lookup;
 	utilities::hook::detour cscr_get_function_reverse_lookup;
@@ -1393,6 +1435,12 @@ namespace gsc_funcs
 	{
 		static char buffer[game::scriptInstance_t::SCRIPTINSTANCE_MAX][0x200] = { 0 };
 
+		byte* lastop = gsc_custom::get_last_opbase(inst);
+		if (lastop)
+		{
+			logger::write(logger::LOG_TYPE_DEBUG, "last oplocation %p : 0x%x", lastop, (int)*reinterpret_cast<uint16_t*>(lastop));
+		}
+
 		// reimplement assert/assertmsg/errormsg functions
 		switch (code)
 		{
@@ -1429,9 +1477,56 @@ namespace gsc_funcs
 			}
 			break;
 		}
-
-		logger::write(terminal ? logger::LOG_TYPE_ERROR : logger::LOG_TYPE_WARN, "[ %s VM ] %s (%lld)", 
+		int log = terminal ? logger::LOG_TYPE_ERROR : logger::LOG_TYPE_WARN;
+		logger::write(log, "[ %s VM ] %s (%lld)",
 			inst ? "CSC" : "GSC", game::scrVarPub[inst].error_message ? game::scrVarPub[inst].error_message : "no message", code);
+
+		if (enable_stack_dump)
+		{
+
+			game::BO4_scrVmPub& vm = game::scrVmPub[inst];
+
+			game::ScrVarValue_t* top = vm.top;
+
+			if (!vm.isShutdown && vm.function_count > 0 && vm.top)
+			{
+				logger::write(log, "==== Stack dump ====");
+
+				int idx{};
+
+				while (top->type != game::TYPE_CODEPOS && vm.top != &vm.stack[0])
+				{
+					switch (top->type)
+					{
+						case game::TYPE_STRING: 
+							logger::write(log, "%d \"%s\"", idx, game::ScrStr_ConvertToString(top->u.pointerValue));
+							break;
+						case game::TYPE_VECTOR: 
+							logger::write(log, "%d (%f, %f, %f)", idx, top->u.vectorValue[0], top->u.vectorValue[1], top->u.vectorValue[2]);
+							break;
+						case game::TYPE_HASH: 
+							logger::write(log, "%d #\"%s\"", idx, hashes::lookup_tmp("hash", top->u.intValue));
+							break;
+						case game::TYPE_FLOAT: 
+							logger::write(log, "%d %f", idx, top->u.floatValue);
+							break;
+						case game::TYPE_INTEGER: 
+							logger::write(log, "%d %lld", idx, top->u.intValue);
+							break;
+						case game::TYPE_UINTPTR: 
+							logger::write(log, "%d ptr[%llx]", idx, top->u.intValue);
+							break;
+						default:
+							logger::write(log, "%d %s", idx, get_scrvar_type_name(top->type));
+							break;
+					}
+					top--;
+					idx--;
+				}
+				logger::write(log, "====================");
+			}
+
+		}
 
 		scrvm_error.invoke<void>(code, inst, unused, terminal);
 	}
@@ -1534,8 +1629,6 @@ namespace gsc_funcs
 						);
 					}
 					else {
-						const char* script_name = hashes::lookup_tmp("script", script_obj->name & 0x7FFFFFFFFFFFFFFF);
-
 						sprintf_s(scriptnamebuffer[inst], "%s::%s@%x",
 							hashes::lookup_tmp("script", script_obj->name & 0x7FFFFFFFFFFFFFFF),
 							hashes::lookup_tmp("function", export_item->name),
@@ -1579,6 +1672,8 @@ namespace gsc_funcs
 
 			// enable dev functions still available in the game
 			enable_dev_func = utilities::json_config::ReadBoolean("gsc", "dev_funcs", false);
+			// dump stack on error
+			enable_stack_dump = utilities::json_config::ReadBoolean("gsc", "error_stack_dump", false);
 
 			scr_get_function_reverse_lookup.create(0x1433AF8A0_g, scr_get_function_reverse_lookup_stub);
 			cscr_get_function_reverse_lookup.create(0x141F132A0_g, cscr_get_function_reverse_lookup_stub);
