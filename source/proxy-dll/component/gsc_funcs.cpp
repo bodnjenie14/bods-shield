@@ -1011,6 +1011,37 @@ namespace gsc_funcs
 			}
 		}
 
+		void hash_lookup(game::scriptInstance_t inst)
+		{
+			game::ScrVarType_t type = game::ScrVm_GetType(inst, 0);
+
+			switch (type)
+			{
+			case game::TYPE_STRING:
+				game::ScrVm_AddConstString(inst, game::ScrVm_GetConstString(inst, 0));
+				return;
+			case game::TYPE_HASH:
+			{
+				game::BO4_AssetRef_t hash;
+				const char* lookup = hashes::lookup(game::ScrVm_GetHash(&hash, inst, 0)->hash);
+
+				if (lookup)
+				{
+					game::ScrVm_AddString(inst, lookup);
+				}
+				else
+				{
+					// can't find value, return base hash
+					game::ScrVm_AddHash(inst, &hash);
+				}
+				return;
+			}
+			default:
+				gsc_error("invalid hash param, a hash or a string should be used, received: %s", inst, false, game::var_typename[type]);
+				return;
+			}
+		}
+
 		game::BO4_BuiltinFunctionDef custom_functions_gsc[] =
 		{
 			{ // ShieldLog(message)
@@ -1124,6 +1155,13 @@ namespace gsc_funcs
 				.max_args = 2,
 				.actionFunc = register_dvar_name,
 				.type = 0
+			},
+			{// ShieldHashLookup(hash hash) -> string
+				.canonId = canon_hash("ShieldHashLookup"),
+				.min_args = 1,
+				.max_args = 1,
+				.actionFunc = hash_lookup,
+				.type = 0
 			}
 		};
 		game::BO4_BuiltinFunctionDef custom_functions_csc[] =
@@ -1231,6 +1269,13 @@ namespace gsc_funcs
 				.min_args = 1,
 				.max_args = 2,
 				.actionFunc = register_dvar_name,
+				.type = 0
+			},
+			{// ShieldHashLookup(hash hash) -> string
+				.canonId = canon_hash("ShieldHashLookup"),
+				.min_args = 1,
+				.max_args = 1,
+				.actionFunc = hash_lookup,
 				.type = 0
 			}
 		};
