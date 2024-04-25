@@ -174,9 +174,23 @@ namespace dvars
 		}
 	}
 
+	game::DvarData* get_session_mode_dvar(const game::dvar_t* dvar)
+	{
+		if (!(dvar->flags & game::DVAR_SESSIONMODE))
+		{
+			return dvar->value;
+		}
+		return &dvar->value[game::Com_SessionMode_GetMode()];
+	}
+
 	std::string get_value_string(const game::dvar_t * dvar, game::DvarValue * value)
 	{
 		std::string result = "N/A";
+
+		if (!value)
+		{
+			value = &get_session_mode_dvar(dvar)->current;
+		}
 
 		switch (dvar->type)
 		{
@@ -243,6 +257,46 @@ namespace dvars
 		}
 
 		return result;
+	}
+
+	bool get_value_bool(const game::dvar_t* dvar, game::DvarValue* value)
+	{
+		if (!value)
+		{
+			value = &get_session_mode_dvar(dvar)->current;
+		}
+
+		switch (dvar->type)
+		{
+		case game::DVAR_TYPE_BOOL:
+			return value->naked.enabled;
+
+		case game::DVAR_TYPE_FLOAT:
+			return value->naked.value;
+
+		case game::DVAR_TYPE_INT:
+			return value->naked.integer;
+
+		case game::DVAR_TYPE_INT64:
+			return value->naked.integer64;
+
+		case game::DVAR_TYPE_UINT64:
+			return value->naked.unsignedInt64;
+
+		case game::DVAR_TYPE_STRING:
+			return value->naked.string && _strcmpi(value->naked.string, "true");
+
+		case game::DVAR_TYPE_FLOAT_2:
+		case game::DVAR_TYPE_FLOAT_3:
+		case game::DVAR_TYPE_LINEAR_COLOR_RGB:
+		case game::DVAR_TYPE_COLOR_XYZ:
+		case game::DVAR_TYPE_COLOR_LAB:
+		case game::DVAR_TYPE_FLOAT_4:
+		case game::DVAR_TYPE_COLOR:
+		case game::DVAR_TYPE_ENUM:
+		default:
+			return false;
+		}
 	}
 
 	game::dvar_t* find_dvar(uint64_t hashRef)

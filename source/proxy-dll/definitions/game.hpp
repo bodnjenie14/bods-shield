@@ -770,12 +770,13 @@ namespace game
 		DvarValue current;
 		DvarValue latched;
 		DvarValue reset;
+		DvarValue unk48;
 	};
 
 	struct dvar_t
 	{
 		BO4_AssetRef_t name;
-		char padding_unk1[8];
+		dvar_t* hashnext;
 		DvarData* value;
 		dvarType_t type;
 		unsigned int flags;
