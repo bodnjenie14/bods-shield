@@ -10,7 +10,7 @@ namespace game
 	//////////////////////////////////////////////////////////////////////////
 	//                              VARIABLES                               //
 	//////////////////////////////////////////////////////////////////////////
-	
+
 	extern std::string version_string;
 
 	typedef float vec_t;
@@ -20,11 +20,11 @@ namespace game
 
 	typedef uint32_t ScrVarIndex_t;
 	typedef uint64_t ScrVarNameIndex_t;
-	
+
 	//////////////////////////////////////////////////////////////////////////
 	//                               STRUCTS                                //
 	//////////////////////////////////////////////////////////////////////////
-	
+
 	enum ControllerIndex_t
 	{
 		INVALID_CONTROLLER_PORT = -1,
@@ -41,8 +41,8 @@ namespace game
 		__int64 hash;
 		__int64 null;
 	};
-	
-	inline BO4_AssetRef_t 
+
+	inline BO4_AssetRef_t
 		AssetRef(uint64_t hashRef)
 	{
 		BO4_AssetRef_t m128i;
@@ -53,29 +53,28 @@ namespace game
 
 	typedef void (*xcommand_t)(void);
 
-	/*
-	struct cmd_function_s 
+/*
+	struct cmd_function_s
 	{
-		cmd_function_s* next;			// 0
-		const char* name;				// 8
-		const char* autoCompleteDir;	// 16
-		const char* autoCompleteExt;	// 24
-		const char* pad;				// 32
-		xcommand_t function;			// 40
-		int autoComplete;				// 48
-	}; // 52
-	*/
-
+		cmd_function_s* next;        // 0
+		const char* name;            // 8
+		const char* autoCompleteDir; // 16
+		const char* autoCompleteExt; // 24
+		const char* pad;             // 32
+		xcommand_t function;         // 40
+		int autoComplete;            // 48
+	};                               // 52
+ */
 	struct cmd_function_t
 	{
-		cmd_function_t* next;		// 0
-		uint64_t name;				// 8
-		uint64_t autoCompleteDir;	// 16
-		uint64_t autoCompleteExt;	// 24
-		uint64_t pad_idk;			// 32
-		xcommand_t function;		// 40
-		//int autoComplete;			// 48
-	}; // 48 i think idk
+		cmd_function_t* next;     // 0
+		uint64_t name;            // 8
+		uint64_t autoCompleteDir; // 16
+		uint64_t autoCompleteExt; // 24
+		uint64_t pad_idk;         // 32
+		xcommand_t function;      // 40
+		// int autoComplete;         // 48
+	};
 
 	enum GSC_EXPORT_FLAGS : byte {
 		GEF_LINKED = 0x01,
@@ -771,19 +770,20 @@ namespace game
 		DvarValue current;
 		DvarValue latched;
 		DvarValue reset;
+		DvarValue unk48;
 	};
 
 	struct dvar_t
 	{
 		BO4_AssetRef_t name;
-		char padding_unk1[8];
+		dvar_t* hashnext;
 		DvarData* value;
 		dvarType_t type;
 		unsigned int flags;
 		DvarLimits domain;
 		char padding_unk2[8];
 	};
-	
+
 	enum eModes : int32_t
 	{
 		MODE_ZOMBIES = 0x0,
@@ -1064,7 +1064,7 @@ namespace game
 	//////////////////////////////////////////////////////////////////////////
 	//                               SYMBOLS                                //
 	//////////////////////////////////////////////////////////////////////////
-	
+
 	template <typename T>
 	class symbol
 	{
@@ -1167,7 +1167,7 @@ namespace game
 	WEAK symbol<const char* (ScrVarIndex_t index)> ScrStr_ConvertToString{ 0x142759030_g };
 	WEAK symbol<ScrVarIndex_t(scriptInstance_t inst, ScrVarIndex_t parentId, ScrVarNameIndex_t index)> ScrVar_NewVariableByIndex{ 0x142760440_g };
 	WEAK symbol<void(scriptInstance_t inst, ScrVarIndex_t id, ScrVarValue_t* value)> ScrVar_SetValue{ 0x1427616B0_g };
-	
+
 	WEAK symbol<BuiltinFunction(uint32_t canonId, int* type, int* min_args, int* max_args)> CScr_GetFunction{ 0x141F13140_g };
 	WEAK symbol<BuiltinFunction(uint32_t canonId, int* type, int* min_args, int* max_args)> Scr_GetFunction{ 0x1433AF840_g };
 	WEAK symbol<void*(uint32_t canonId, int* type, int* min_args, int* max_args)> CScr_GetMethod{ 0x141F13650_g };
@@ -1203,7 +1203,7 @@ namespace game
 	WEAK symbol<float(lua_state* luaVM, const hks_object* obj)> hks_obj_tonumber{ 0x143755A90_g };
 	WEAK symbol<const char*> hks_typename{ 0x1455B2360_g };
 	WEAK symbol<void(lua_state* luaVm, int index, const char* k)> hksi_lua_setfield{0x1422C8E80_g};
-	
+
 	// console labels
 	WEAK symbol<const char*> builtinLabels{ 0x144F11530_g };
 	// gsc types
@@ -1212,16 +1212,16 @@ namespace game
 	WEAK symbol<void(BO4_AssetRef_t* cmdName, xcommand_t function, cmd_function_t* allocedCmd)> Cmd_AddCommandInternal{ 0x143CDEE80_g };
 
 #define Cmd_AddCommand(name, function) \
-    static game::cmd_function_t __cmd_func_##function;  \
-    game::BO4_AssetRef_t __cmd_func_name_##function { (int64_t)fnv1a::generate_hash(name), 0 }; \
-    game::Cmd_AddCommandInternal(&__cmd_func_name_##function, function, &__cmd_func_##function)
+	static game::cmd_function_t __cmd_func_##function;  \
+	game::BO4_AssetRef_t __cmd_func_name_##function { (int64_t)fnv1a::generate_hash(name), 0 }; \
+	game::Cmd_AddCommandInternal(&__cmd_func_name_##function, function, &__cmd_func_##function)
 
 #define R_AddCmdDrawText(TXT, MC, F, X, Y, XS, YS, R, C, S) \
 	T8_AddBaseDrawTextCmd(TXT, MC, F, X, Y, XS, YS, R, C, S, -1, 0, 0)
 
 #define R_AddCmdDrawTextWithCursor(TXT, MC, F, X, Y, XS, YS, R, C, S, CP, CC) \
 	T8_AddBaseDrawTextCmd(TXT, MC, F, X, Y, XS, YS, R, C, S, CP, CC, 0)
-	
+
 #define Com_Error(code, fmt, ...) \
 		Com_Error_(__FILE__, __LINE__, code, fmt, ##__VA_ARGS__)
 

@@ -67,7 +67,7 @@ namespace command
 	{
 		auto* cmd_args = get_cmd_args();
 		game::Cmd_TokenizeStringKernel(0, game::CONTROLLER_INDEX_FIRST, text.data(),
-		                               512 - cmd_args->totalUsedArgvPool, false, cmd_args);
+									   512 - cmd_args->totalUsedArgvPool, false, cmd_args);
 
 		this->nesting_ = cmd_args->nesting;
 	}

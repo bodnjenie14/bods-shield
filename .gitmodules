@@ -31,3 +31,6 @@
 [submodule "deps/rapidcsv"]
 	path = deps/rapidcsv
 	url = https://github.com/d99kris/rapidcsv
+[submodule "deps/dbflib"]
+	path = deps/dbflib
+	url = https://github.com/ate47/dbflib

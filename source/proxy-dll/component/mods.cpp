@@ -14,6 +14,8 @@
 #include <utilities/io.hpp>
 #include <utilities/hook.hpp>
 
+#include <dbflib.hpp>
+
 namespace mods {
 	// GSC File magic (8 bytes)
 	constexpr uint64_t gsc_magic = 0x36000A0D43534780;
@@ -25,6 +27,54 @@ namespace mods {
 	std::filesystem::path shield_mod_dir = "project-bo4/internals";
 
 	namespace {
+		struct dbf_file_asset_entry
+		{
+			xassets::XAssetType type;
+			uint64_t name;
+			void* header;
+		};
+
+		struct dbf_file_asset_table
+		{
+			uint64_t count;
+			dbf_file_asset_entry* entries;
+		};
+
+		struct dbf_file_asset
+		{
+			std::string data{};
+			
+			void validate()
+			{
+				dbflib::DB_FILE* file = reinterpret_cast<dbflib::DB_FILE*>(data.data());
+				// assert that the file is valid and linkable
+				file->Validate();
+				file->Link();
+			}
+
+			dbf_file_asset_table* get_table()
+			{
+				dbflib::DB_FILE* file = reinterpret_cast<dbflib::DB_FILE*>(data.data());
+				file->Link();
+				return file->Start<dbf_file_asset_table>();
+			}
+
+			void* get_header(xassets::XAssetType type, uint64_t name)
+			{
+				dbf_file_asset_table* table = get_table();
+
+				for (size_t i = 0; i < table->count; i++)
+				{
+					auto& e = table->entries[i];
+					if (e.type == type && e.name == name)
+					{
+						return e.header;
+					}
+				}
+				return nullptr;
+			}
+		};
+
 		struct raw_file
 		{
 			xassets::raw_file_header header{};
@@ -237,6 +287,7 @@ namespace mods {
 			std::vector<scriptparsetree> gsc_files{};
 			std::vector<raw_file> raw_files{};
 			std::vector<lua_file> lua_files{};
+			std::vector<dbf_file_asset> dbf_files{};
 			std::vector<string_table_file> csv_files{};
 			std::vector<localize> localizes{};
 			std::vector<cache_entry> cache_entries{};
@@ -348,6 +399,17 @@ namespace mods {
 			void* get_xasset(xassets::XAssetType type, uint64_t name)
 			{
 				std::lock_guard lg{ load_mutex };
+
+				for (dbf_file_asset& dbf_file : dbf_files)
+				{
+					void* ret = dbf_file.get_header(type, name);
+
+					if (ret)
+					{
+						return ret;
+					}
+				}
+
 				switch (type)
 				{
 				case xassets::ASSET_TYPE_SCRIPTPARSETREE:
@@ -815,6 +877,49 @@ namespace mods {
 				else if (!_strcmpi("weapon", type_val))
 				{
 					return weapons::load_weapon_def(member, mod_name, mod_path);
+				}
+				else if (!_strcmpi("dynamic", type_val))
+				{
+					auto path_mb = member.FindMember("path");
+
+					if (path_mb == member.MemberEnd() || !path_mb->value.IsString())
+					{
+						logger::write(logger::LOG_TYPE_WARN, std::format("mod {} is containing a dynamic storage without a path", mod_name));
+						return false;
+					}
+
+					std::filesystem::path path_cfg = path_mb->value.GetString();
+					auto path = path_cfg.is_absolute() ? path_cfg : (mod_path / path_cfg);
+
+					dbf_file_asset tmp{};
+
+					if (!utilities::io::read_file(path.string(), &tmp.data))
+					{
+						logger::write(logger::LOG_TYPE_ERROR, std::format("can't read dynamic storage file {} for mod {}", path.string(), mod_name));
+						return false;
+					}
+
+					try
+					{
+						tmp.validate();
+					}
+					catch (std::exception& e)
+					{
+						logger::write(logger::LOG_TYPE_ERROR, std::format("can't read dynamic storage file {} for mod {}: {}", path.string(), mod_name, e.what()));
+						return false;
+					}
+
+#ifdef _DEBUG
+					logger::write(logger::LOG_TYPE_DEBUG, std::format("mod {}: loaded dynamic storage file {}", mod_name, path.string()));
+					dbf_file_asset_table* table = tmp.get_table();
+					for (size_t i = 0; i < table->count; i++)
+					{
+						dbf_file_asset_entry& e = table->entries[i];
+						logger::write(logger::LOG_TYPE_DEBUG, std::format("{}/{} {:x}->{} ({})", mod_name, path.string(), e.name, e.header, xassets::DB_GetXAssetTypeName(e.type)));
+					}
+#endif
+
+					dbf_files.emplace_back(tmp);
 				}
 				else
 				{
