@@ -10,14 +10,14 @@
 
 namespace game
 {
-	WEAK symbol<int(const int a1)> LobbySession_GetControllingLobbySession{ 0x1439066F0_g };
-	WEAK symbol<int(const int LobbyModule, const int LobbyType)> LobbySession_GetLobbyMode{ 0x143906830_g };
-	WEAK symbol<int(const game::ControllerIndex_t controllerIndex, const int statsLocation)> LiveStorage_DoWeHaveStats{ 0x1438B79D0_g };
-	WEAK symbol<int(game::eModes mode, const game::ControllerIndex_t controllerIndex)> LiveStats_GetPrestige{ 0x1438A7390_g };
-	WEAK symbol<int(game::eModes mode, const game::ControllerIndex_t controllerIndex)> LiveStats_GetRank{ 0x1438A7430_g };
-	WEAK symbol<int(game::eModes mode, const game::ControllerIndex_t controllerIndex)> LiveStats_GetXp{ 0x1438A78B0_g };
-	WEAK symbol<int(game::eModes mode, const game::ControllerIndex_t controllerIndex, const char* name)> LiveStats_GetIntPlayerStatByKey{ 0x1438A66A0_g };
-	WEAK symbol<int(game::eModes mode, const int Xp)> CL_Rank_GetRankForXP{ 0x1422EF900_g };
+	WEAK symbol<int(const int a1)> LobbySession_GetControllingLobbySession{0x1439066F0_g};
+	WEAK symbol<int(const int LobbyModule, const int LobbyType)> LobbySession_GetLobbyMode{0x143906830_g};
+	WEAK symbol<int(const game::ControllerIndex_t controllerIndex, const int statsLocation)> LiveStorage_DoWeHaveStats{0x1438B79D0_g};
+	WEAK symbol<int(game::eModes mode, const game::ControllerIndex_t controllerIndex)> LiveStats_GetPrestige{0x1438A7390_g};
+	WEAK symbol<int(game::eModes mode, const game::ControllerIndex_t controllerIndex)> LiveStats_GetRank{0x1438A7430_g};
+	WEAK symbol<int(game::eModes mode, const game::ControllerIndex_t controllerIndex)> LiveStats_GetXp{0x1438A78B0_g};
+	WEAK symbol<int(game::eModes mode, const game::ControllerIndex_t controllerIndex, const char* name)> LiveStats_GetIntPlayerStatByKey{0x1438A66A0_g};
+	WEAK symbol<int(game::eModes mode, const int Xp)> CL_Rank_GetRankForXP{0x1422EF900_g};
 }
 
 namespace unlockall
@@ -41,76 +41,76 @@ namespace unlockall
 		utilities::hook::detour livestats_getprestige_hook;
 
 		uint32_t zm_loot_table[] =
-		{
-			1000001, // zm_bgb_ctrl_z
-			1000002, // zm_bgb_dead_of_nuclear_winter
-			1000003, // zm_bgb_in_plain_sight
-			1000004, // zm_bgb_licensed_contractor
-			1000005, // zm_bgb_phantom_reload
-			1000006, // zm_bgb_sword_flay
-			1000007, // zm_bgb_whos_keeping_score
-			1000008, // zm_bgb_alchemical_antithesis
-			1000009, // zm_bgb_blood_debt
-			1000010, // zm_bgb_extra_credit
-			1000011, // zm_bgb_immolation_liquidation
-			1000012, // zm_bgb_kill_joy
-			1000013, // zm_bgb_shields_up
-			1000014, // zm_bgb_free_fire
-			1000015, // zm_bgb_power_keg
-			1000016, // zm_bgb_undead_man_walking
-			1000017, // zm_bgb_wall_to_wall_clearance
-			1000018, // zm_bgb_cache_back
-			1000019, // zm_bgb_join_the_party
-			1000020, // zm_bgb_wall_power
-			1000021, // talisman_box_guarantee_box_only
-			1000022, // talisman_coagulant
-			1000023, // talisman_extra_claymore
-			1000024, // talisman_extra_frag
-			1000025, // talisman_extra_molotov
-			1000026, // talisman_extra_semtex
-			1000027, // talisman_impatient
-			1000028, // talisman_weapon_reducepapcost
-			1000029, // talisman_perk_reducecost_1
-			1000030, // talisman_perk_reducecost_2
-			1000031, // talisman_perk_reducecost_3
-			1000032, // talisman_perk_reducecost_4
-			1000033, // talisman_shield_price
-			1000034, // talisman_special_xp_rate
-			1000035, // talisman_start_weapon_smg
-			1000036, // talisman_box_guarantee_lmg
-			1000037, // talisman_extra_miniturret
-			1000038, // talisman_perk_start_1
-			1000039, // talisman_perk_start_2
-			1000040, // talisman_perk_start_3
-			1000041, // talisman_perk_start_4
-			1000042, // talisman_shield_durability_rare
-			1000043, // talisman_start_weapon_ar
-			1000044, // talisman_perk_permanent_1
-			1000045, // talisman_perk_permanent_2
-			1000046, // talisman_perk_permanent_3
-			1000047, // talisman_perk_permanent_4
-			1000048, // talisman_shield_durability_legendary
-			1000049, // talisman_special_startlv2
-			1000050, // talisman_start_weapon_lmg
-			1000051, // talisman_special_startlv3
-			1000052, // talisman_perk_mod_single
-			1000053, // zm_bgb_refresh_mint
-			1000054, // zm_bgb_perk_up
-			1000055, // zm_bgb_conflagration_liquidation
-			1000056, // zm_bgb_bullet_boost
-			1000057, // zm_bgb_talkin_bout_regeneration
-			1000058, // zm_bgb_dividend_yield
-			1000059, // zm_bgb_suit_up
-			1000060, // talisman_permanent_heroweap_armor
-			1000061, // talisman_extra_self_revive
-			1000062, // zm_bgb_perkaholic
-			1000063, // zm_bgb_near_death_experience
-			1000064, // zm_bgb_shopping_free
-			1000065, // zm_bgb_reign_drops
-			1000066, // zm_bgb_phoenix_up
-			1000067, // zm_bgb_head_drama
-			1000068, // zm_bgb_secret_shopper
-			1000069  // zm_bgb_power_vacuum
+			{
+				1000001, // zm_bgb_ctrl_z
+				1000002, // zm_bgb_dead_of_nuclear_winter
+				1000003, // zm_bgb_in_plain_sight
+				1000004, // zm_bgb_licensed_contractor
+				1000005, // zm_bgb_phantom_reload
+				1000006, // zm_bgb_sword_flay
+				1000007, // zm_bgb_whos_keeping_score
+				1000008, // zm_bgb_alchemical_antithesis
+				1000009, // zm_bgb_blood_debt
+				1000010, // zm_bgb_extra_credit
+				1000011, // zm_bgb_immolation_liquidation
+				1000012, // zm_bgb_kill_joy
+				1000013, // zm_bgb_shields_up
+				1000014, // zm_bgb_free_fire
+				1000015, // zm_bgb_power_keg
+				1000016, // zm_bgb_undead_man_walking
+				1000017, // zm_bgb_wall_to_wall_clearance
+				1000018, // zm_bgb_cache_back
+				1000019, // zm_bgb_join_the_party
+				1000020, // zm_bgb_wall_power
+				1000021, // talisman_box_guarantee_box_only
+				1000022, // talisman_coagulant
+				1000023, // talisman_extra_claymore
+				1000024, // talisman_extra_frag
+				1000025, // talisman_extra_molotov
+				1000026, // talisman_extra_semtex
+				1000027, // talisman_impatient
+				1000028, // talisman_weapon_reducepapcost
+				1000029, // talisman_perk_reducecost_1
+				1000030, // talisman_perk_reducecost_2
+				1000031, // talisman_perk_reducecost_3
+				1000032, // talisman_perk_reducecost_4
+				1000033, // talisman_shield_price
+				1000034, // talisman_special_xp_rate
+				1000035, // talisman_start_weapon_smg
+				1000036, // talisman_box_guarantee_lmg
+				1000037, // talisman_extra_miniturret
+				1000038, // talisman_perk_start_1
+				1000039, // talisman_perk_start_2
+				1000040, // talisman_perk_start_3
+				1000041, // talisman_perk_start_4
+				1000042, // talisman_shield_durability_rare
+				1000043, // talisman_start_weapon_ar
+				1000044, // talisman_perk_permanent_1
+				1000045, // talisman_perk_permanent_2
+				1000046, // talisman_perk_permanent_3
+				1000047, // talisman_perk_permanent_4
+				1000048, // talisman_shield_durability_legendary
+				1000049, // talisman_special_startlv2
+				1000050, // talisman_start_weapon_lmg
+				1000051, // talisman_special_startlv3
+				1000052, // talisman_perk_mod_single
+				1000053, // zm_bgb_refresh_mint
+				1000054, // zm_bgb_perk_up
+				1000055, // zm_bgb_conflagration_liquidation
+				1000056, // zm_bgb_bullet_boost
+				1000057, // zm_bgb_talkin_bout_regeneration
+				1000058, // zm_bgb_dividend_yield
+				1000059, // zm_bgb_suit_up
+				1000060, // talisman_permanent_heroweap_armor
+				1000061, // talisman_extra_self_revive
+				1000062, // zm_bgb_perkaholic
+				1000063, // zm_bgb_near_death_experience
+				1000064, // zm_bgb_shopping_free
+				1000065, // zm_bgb_reign_drops
+				1000066, // zm_bgb_phoenix_up
+				1000067, // zm_bgb_head_drama
+				1000068, // zm_bgb_secret_shopper
+				1000069  // zm_bgb_power_vacuum
 		};
 
 		inline bool is_zm_loot(int item_id)
@@ -237,7 +237,6 @@ namespace unlockall
 		{
 			GameStats mp;
 			GameStats zm;
-			GameStats wz;
 		};
 
 		player_gamemode_stats playerstats;
@@ -257,10 +256,8 @@ namespace unlockall
 				return;
 			}
 
-			// todo is fix the string format for now pea patching in lua //  
 			if (!utilities::string::is_integer(arg3)) return;
 			int num = std::stoi(arg3);
-
 
 			override_stat[arg2] = true;
 
@@ -279,15 +276,6 @@ namespace unlockall
 				if (arg2 == "prestige") playerstats.zm.prestige = num;
 				if (arg2 == "paragonRank") playerstats.zm.paragonRank = num;
 			}
-
-			if (arg1 == "wz")
-			{
-				if (arg2 == "rank") playerstats.wz.rank = num;
-				if (arg2 == "xp") playerstats.wz.xp = num;
-				if (arg2 == "prestige") playerstats.wz.prestige = num;
-				if (arg2 == "paragonRank") playerstats.wz.paragonRank = num;
-			}
-
 		}
 
 		void get_player_level()
@@ -311,7 +299,6 @@ namespace unlockall
 			{
 				if (mode == game::eModes::MODE_MULTIPLAYER) return playerstats.mp.rank;
 				if (mode == game::eModes::MODE_ZOMBIES) return playerstats.zm.rank;
-				if (mode == game::eModes::MODE_WARZONE) return playerstats.wz.rank;
 			}
 
 			if (game::LiveStorage_DoWeHaveStats(controllerIndex, 0))
@@ -345,7 +332,6 @@ namespace unlockall
 			{
 				if (mode == game::eModes::MODE_MULTIPLAYER) return playerstats.mp.xp;
 				if (mode == game::eModes::MODE_ZOMBIES) return playerstats.zm.xp;
-				if (mode == game::eModes::MODE_WARZONE) return playerstats.wz.xp;
 			}
 
 			{
@@ -367,13 +353,6 @@ namespace unlockall
 
 		int livestats_getprestige_stub(game::eModes mode, const game::ControllerIndex_t controllerIndex)
 		{
-			if (override_stat["prestige"] && controllerIndex == game::ControllerIndex_t::CONTROLLER_INDEX_FIRST)
-			{
-				if (mode == game::eModes::MODE_MULTIPLAYER) return playerstats.mp.prestige;
-				if (mode == game::eModes::MODE_ZOMBIES) return playerstats.zm.prestige;
-				if (mode == game::eModes::MODE_WARZONE) return playerstats.wz.prestige;
-			}
-
 			return livestats_getprestige_hook.invoke<int>(mode, controllerIndex);
 		}
 
@@ -392,7 +371,7 @@ namespace unlockall
 			return false;
 		}
 
-		int LiveStorage_GetStatsBufferWithCaller(const game::ControllerIndex_t controllerIndex, int a2, const char* a3, int a4, game::eModes mode, const int statsLocation)
+		int LiveStorage_GetStatsBufferWithCaller(const game::ControllerIndex_t controllerIndex, int a2, const char* a3, int a4,  game::eModes mode, const int statsLocation)
 		{
 		}
 	}
@@ -402,7 +381,7 @@ namespace unlockall
 	public:
 		void post_unpack() override
 		{
-			command::add("unlock", [&](const command::params& params) { unlock_func(params); });
+			command::add("unlock", [&](const command::params& params){ unlock_func(params); });
 			unlock["all"] = utilities::json_config::ReadBoolean("unlock", "all", false);
 			unlock["attachments"] = utilities::json_config::ReadBoolean("unlock", "attachments", false);
 			unlock["attachmentslot"] = utilities::json_config::ReadBoolean("unlock", "attachmentslot", false);
@@ -424,10 +403,10 @@ namespace unlockall
 			bg_unlockablesgetcustomclasscount_hook.create(0x1406ae060_g, bg_unlockablesgetcustomclasscount);
 			bg_unlockablesisitemlocked_hook.create(0x1406B3AA0_g, bg_unlockablesisitemlocked);
 
-			command::add("setplayerstat", [&](const command::params& params) { setplayerstat(params); });
+			command::add("setplayerstat", [&](const command::params& params){ setplayerstat(params); });
 			livestats_getxp_hook.create(0x1438A78B0_g, livestats_getxp_stub);
 			livestats_getrank_hook.create(0x1438A7430_g, livestats_getrank_stub);
-			livestats_getprestige_hook.create(0x1438A7390_g, livestats_getprestige_stub);
+			// livestats_getprestige_hook.create(0x1438A7390_g, livestats_getprestige_stub);
 
 			// utilities::hook::call(0x1438C2B00_g, sub_1438C2B00_stub); // LiveStats read ddl?
 			// utilities::hook::call(0x143803FF0_g, live_is_user_signed_in_to_demonware_stub); // BAD
@@ -438,5 +417,3 @@ namespace unlockall
 }
 
 REGISTER_COMPONENT(unlockall::component)
-
-
