@@ -52,6 +52,31 @@ namespace game
 		xcommand_t function;
 	};
 
+	enum GSC_EXPORT_FLAGS : byte {
+		GEF_LINKED = 0x01,
+		GEF_AUTOEXEC = 0x02,
+		GEF_PRIVATE = 0x04,
+		GEF_CLASS_MEMBER = 0x08,
+		GEF_CLASS_DESTRUCTOR = 0x10,
+		GEF_VE = 0x20,
+		GEF_EVENT = 0x40,
+		GEF_CLASS_LINKED = 0x80,
+		GEF_CLASS_VTABLE = 0x86
+	};
+
+	enum GSC_IMPORT_FLAGS : byte {
+		GIF_FUNC_METHOD = 0x1,
+		GIF_FUNCTION = 0x2,
+		GIF_FUNCTION_THREAD = 0x3,
+		GIF_FUNCTION_CHILDTHREAD = 0x4,
+		GIF_METHOD = 0x5,
+		GIF_METHOD_THREAD = 0x6,
+		GIF_METHOD_CHILDTHREAD = 0x7,
+		GIF_CALLTYPE_MASK = 0xF,
+		GIF_DEV_CALL = 0x10,
+		GIF_GET_CALL = 0x20
+	};
+
 	struct GSC_IMPORT_ITEM
 	{
 		uint32_t name;
@@ -330,6 +355,32 @@ namespace game
 		int refCount;
 		uint32_t groupId;
 	};
+
+	struct CmdArgs
+	{
+		int nesting;
+		int localClientNum[8];
+		int controllerIndex[8];
+		int argshift[8];
+		int argc[8];
+		const char** argv[8];
+		char textPool[8192];
+		const char* argvPool[512];
+		int usedTextPool[8];
+		int totalUsedArgvPool;
+		int totalUsedTextPool;
+	};
+
+
+	struct TLSData
+	{
+		void* vaInfo; // va_info_t
+		void* errorJmpBuf; // jmp_buf
+		void* traceInfo; // TraceThreadInfo
+		CmdArgs* cmdArgs;
+		void* errorData; // ErrorThreadLocal
+	};
+
 
 	enum keyNum_t
 	{
@@ -647,6 +698,13 @@ namespace game
 		DVAR_SESSIONMODE = 1 << 15
 	};
 
+	enum dvarSource : int32_t
+	{
+		DVAR_SOURCE_INTERNAL = 0x0,
+		DVAR_SOURCE_EXTERNAL = 0x1
+	};
+
+
 	union DvarLimits
 	{
 		struct
@@ -712,12 +770,13 @@ namespace game
 		DvarValue current;
 		DvarValue latched;
 		DvarValue reset;
+		DvarValue unk48;
 	};
 
 	struct dvar_t
 	{
 		BO4_AssetRef_t name;
-		char padding_unk1[8];
+		dvar_t* hashnext;
 		DvarData* value;
 		dvarType_t type;
 		unsigned int flags;
@@ -811,6 +870,12 @@ namespace game
 		SCOPED_CRITSECT_TRY = 0x3,
 	};
 
+	enum critical_section : int32_t
+	{
+		CRITSECT_GSC_OBJECTS = 54,
+		CRITSECT_LUA = 62
+	};
+
 	class scoped_critical_section
 	{
 		int32_t _s;
@@ -818,9 +883,29 @@ namespace game
 		bool _isScopedRelease;
 		scoped_critical_section* _next;
 	public:
-		scoped_critical_section(int32_t s, scoped_critical_section_type type);
+		scoped_critical_section(critical_section s, scoped_critical_section_type type);
 		~scoped_critical_section();
 	};
+
+	enum hks_type : uint32_t
+	{
+		HKST_TNIL = 0x0,
+		HKST_TBOOLEAN = 0x1,
+		HKST_TLIGHTUSERDATA = 0x2,
+		HKST_TNUMBER = 0x3,
+		HKST_TSTRING = 0x4,
+		HKST_TTABLE = 0x5,
+		HKST_TFUNCTION = 0x6,
+		HKST_TUSERDATA = 0x7,
+		HKST_TTHREAD = 0x8,
+		HKST_TIFUNCTION = 0x9,
+		HKST_TCFUNCTION = 0xA,
+		HKST_TUI64 = 0xB,
+		HKST_TSTRUCT = 0xC,
+		HKST_TXHASH = 0xD,
+		HKST_COUNT = 0xE,
+	};
+
 
 	struct hks_global {};
 	struct hks_callstack
@@ -832,10 +917,12 @@ namespace game
 		const void* m_hook_return_addr; // const hksInstruction*
 		int32_t m_hook_level;
 	};
+	struct hks_upvalue {};
+	typedef void* hks_errorhandler;
 	struct lua_state;
 	struct hks_object
 	{
-		uint32_t t;
+		hks_type t;
 		union {
 			void* ptr;
 			float number;
@@ -862,7 +949,12 @@ namespace game
 		hks_global* m_global;
 		hks_callstack m_callStack;
 		hks_api_stack m_apistack;
-
+		hks_upvalue* pending;
+		hks_object globals;
+		hks_object m_cEnv;
+		hks_errorhandler m_callsites;
+		int32_t m_numberOfCCalls;
+		byte* m_context;
 		// ...
 	};
 
@@ -902,15 +994,17 @@ namespace game
 	WEAK symbol<void(const char* file, int line, int code, const char* fmt, ...)> Com_Error_{ 0x14288B410_g };
 
 	// mutex
-	WEAK symbol<void(scoped_critical_section* sec, int32_t s, scoped_critical_section_type type)> ScopedCriticalSectionConstructor{ 0x14289E3C0_g };
+	WEAK symbol<void(scoped_critical_section* sec, critical_section s, scoped_critical_section_type type)> ScopedCriticalSectionConstructor{ 0x14289E3C0_g };
 	WEAK symbol<void(scoped_critical_section* sec)> ScopedCriticalSectionDestructor{ 0x14289E440_g };
 
 	// CMD
 	WEAK symbol<void(int localClientNum, const char* text)> Cbuf_AddText{ 0x143CDE880_g };
+	WEAK symbol<int()> Com_LocalClients_GetPrimary{ 0x142893AF0_g };
 
 	// Dvar
 	WEAK symbol<void* (const char* dvarName)> Dvar_FindVar{ 0x143CEBE40_g };
 	WEAK symbol<void* (void* dvarHash)> Dvar_FindVar_Hash{ 0x143CEBED0_g };
+	WEAK symbol<dvar_t* (BO4_AssetRef_t* dvar_name, const char* string, dvarSource source, uint32_t flags, bool create_if_missing)> Dvar_SetFromStringByNameFromSourceHashed{ 0x143CF4AC0_g };
 
 	// Live Functions
 	WEAK symbol<bool(uint64_t, int*)> Live_GetConnectivityInformation{ 0x1437FA460_g };
@@ -970,12 +1064,14 @@ namespace game
 	WEAK symbol<BuiltinFunction(uint32_t canonId, int* type, int* min_args, int* max_args)> CScr_GetFunction{ 0x141F13140_g };
 	WEAK symbol<BuiltinFunction(uint32_t canonId, int* type, int* min_args, int* max_args)> Scr_GetFunction{ 0x1433AF840_g };
 	WEAK symbol<void*(uint32_t canonId, int* type, int* min_args, int* max_args)> CScr_GetMethod{ 0x141F13650_g };
-	WEAK symbol<void*(uint32_t canonId, int* type, int* min_args, int* max_args)> Scr_GetMethod{ 0x1433AFC20_g };
+	WEAK symbol<void* (uint32_t canonId, int* type, int* min_args, int* max_args)> Scr_GetMethod{ 0x1433AFC20_g };
+	WEAK symbol<void (game::scriptInstance_t inst, byte* codepos, const char** scriptname, int32_t* sloc, int32_t* crc, int32_t* vm)> Scr_GetGscExportInfo{ 0x142748550_g };
 
 	WEAK symbol<void(uint64_t code, scriptInstance_t inst, char* unused, bool terminal)> ScrVm_Error{ 0x142770330_g };
 	WEAK symbol<BO4_scrVarPub> scrVarPub{ 0x148307880_g };
 	WEAK symbol<BO4_scrVarGlob> scrVarGlob{ 0x148307830_g };
 	WEAK symbol<BO4_scrVmPub> scrVmPub{ 0x148307AA0_g };
+	WEAK symbol<byte> mt_buffer{ 0x147DAFC20_g };
 
 	WEAK symbol<VM_OP_FUNC> gVmOpJumpTable{ 0x144EED340_g };
 	WEAK symbol<uint32_t> gObjFileInfoCount{ 0x1482F76B0_g };
@@ -986,13 +1082,16 @@ namespace game
 	WEAK symbol<void(int code, const char* error, lua_state* s)> Lua_CoD_LuaStateManager_Error{ 0x14398A860_g };
 	WEAK symbol<const char*(lua_state* luaVM, hks_object* obj, size_t* len)> hks_obj_tolstring{ 0x143755730_g };
 	WEAK symbol<float(lua_state* luaVM, const hks_object* obj)> hks_obj_tonumber{ 0x143755A90_g };
-
+	WEAK symbol<const char*> hks_typename{ 0x1455B2360_g };
+	WEAK symbol<void(lua_state* luaVm, int index, const char* k)> hksi_lua_setfield{0x1422C8E80_g};
+	
 	// console labels
 	WEAK symbol<const char*> builtinLabels{ 0x144F11530_g };
 	// gsc types
 	WEAK symbol<const char*> var_typename{ 0x144EED240_g };
 
-	WEAK symbol<void(BO4_AssetRef_t* cmdName, xcommand_t function, cmd_function_t* allocedCmd)> Cmd_AddCommandInternal{0x143CDEE80_g};
+	WEAK symbol<void(BO4_AssetRef_t* cmdName, xcommand_t function, cmd_function_t* allocedCmd)> Cmd_AddCommandInternal{ 0x143CDEE80_g };
+	WEAK symbol<TLSData*()> Sys_GetTLS{ 0x143C56140_g };
 
 #define Cmd_AddCommand(name, function) \
     static game::cmd_function_t __cmd_func_##function;  \
@@ -1007,12 +1106,4 @@ namespace game
 	
 #define Com_Error(code, fmt, ...) \
 		Com_Error_(__FILE__, __LINE__, code, fmt, ##__VA_ARGS__)
-
-	class scoped_critical_section_guard_lock
-	{
-
-
-
-
-	};
 }

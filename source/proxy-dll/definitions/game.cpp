@@ -10,7 +10,7 @@ namespace game
     Com_GetBuildVersion_t Com_GetBuildVersion = (Com_GetBuildVersion_t)0x142892F40_g;
 
 
-    scoped_critical_section::scoped_critical_section(int32_t s, scoped_critical_section_type type) : _s(0), _hasOwnership(false), _isScopedRelease(false), _next(nullptr)
+    scoped_critical_section::scoped_critical_section(critical_section s, scoped_critical_section_type type) : _s(0), _hasOwnership(false), _isScopedRelease(false), _next(nullptr)
     {
         game::ScopedCriticalSectionConstructor(this, s, type);
     }
