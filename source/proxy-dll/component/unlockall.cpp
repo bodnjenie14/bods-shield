@@ -103,28 +103,45 @@ namespace unlockall
 			1000069  // zm_bgb_power_vacuum
 		};
 
+		void init_dvars()
+		{
+			for (auto& pair : unlock)
+			{
+				const char* cmd = utilities::string::va("set shield_unlock_%s %i;", pair.first.c_str(), pair.second);
+				logger::write(logger::LOG_TYPE_INFO, cmd);
+				game::Cbuf_AddText(0, cmd);
+			}
+		}
+
 		void enable_unlock_hooks()
 		{
+			init_dvars();
 			unlock_dvars_enabled = true;
+		}
+
+		std::string get_moddvar_string(std::string dvarstring)
+		{
+			game::dvar_t* dvar = dvars::find_dvar(dvarstring);
+			return dvars::get_value_string(dvar, &dvar->value->current);
 		}
 
 		int unlock_active(std::string name)
 		{
 			if (unlock_dvars_enabled)
 			{
-				game::dvar_t* dvar = dvars::find_dvar("shield_unlock_all");
-				std::string res = dvars::get_value_string(dvar, &dvar->value->current);
-				if (res == "1") return 1;
-				dvar = dvars::find_dvar("shield_unlock_" + name);
-				res = dvars::get_value_string(dvar, &dvar->value->current);
-				if (res == "1") return 1;
+				if (get_moddvar_string("shield_unlock_all") == "1" ||
+					get_moddvar_string("shield_unlock_" + name) == "1")
+				{
+					return 1;
+				}
 			}
 			else
 			{
 				if (unlock["all"] || unlock[name]) return 1;
 			}
+			return 0;
 		}
-			
+
 		inline bool is_zm_loot(int item_id)
 		{
 			auto it = std::find(
@@ -378,17 +395,6 @@ namespace unlockall
 		int LiveStorage_GetStatsBufferWithCaller(const game::ControllerIndex_t controllerIndex, int a2, const char* a3, int a4, game::eModes mode, const int statsLocation)
 		{
 		}
-
-		void init_dvars()
-		{
-			for (auto& pair : unlock)
-			{
-				//const char* cmd = utilities::string::va("set shield_unlock_%s %i;", pair.first, pair.second);
-				const char* cmd = utilities::string::va("set shield_unlock_%s %i;", pair.first.c_str(), pair.second);
-				logger::write(logger::LOG_TYPE_INFO, cmd);
-				game::Cbuf_AddText(0, cmd);
-			}
-		}
 	}
 
 	class component final : public component_interface
@@ -429,7 +435,6 @@ namespace unlockall
 			command::add("setplayerstat", [&](const command::params& params) { setplayerstat(params); });
 			command::add("get_player_level", get_player_level);
 			command::add("enable_unlock_hooks", enable_unlock_hooks);
-			command::add("init_dvars", init_dvars);
 		}
 	};
 }
