@@ -3,27 +3,17 @@
 #include "definitions/game.hpp"
 #include "definitions/variables.hpp"
 #include "command.hpp"
+#include "dvars.hpp"
 
 #include <utilities/hook.hpp>
 #include <utilities/json_config.hpp>
 #include <utilities/string.hpp>
 
-namespace game
-{
-	WEAK symbol<int(const int a1)> LobbySession_GetControllingLobbySession{ 0x1439066F0_g };
-	WEAK symbol<int(const int LobbyModule, const int LobbyType)> LobbySession_GetLobbyMode{ 0x143906830_g };
-	WEAK symbol<int(const game::ControllerIndex_t controllerIndex, const int statsLocation)> LiveStorage_DoWeHaveStats{ 0x1438B79D0_g };
-	WEAK symbol<int(game::eModes mode, const game::ControllerIndex_t controllerIndex)> LiveStats_GetPrestige{ 0x1438A7390_g };
-	WEAK symbol<int(game::eModes mode, const game::ControllerIndex_t controllerIndex)> LiveStats_GetRank{ 0x1438A7430_g };
-	WEAK symbol<int(game::eModes mode, const game::ControllerIndex_t controllerIndex)> LiveStats_GetXp{ 0x1438A78B0_g };
-	WEAK symbol<int(game::eModes mode, const game::ControllerIndex_t controllerIndex, const char* name)> LiveStats_GetIntPlayerStatByKey{ 0x1438A66A0_g };
-	WEAK symbol<int(game::eModes mode, const int Xp)> CL_Rank_GetRankForXP{ 0x1422EF900_g };
-}
-
 namespace unlockall
 {
 	namespace
 	{
+		bool unlock_dvars_enabled;
 		std::unordered_map<std::string, bool> unlock;
 
 		utilities::hook::detour loot_getitemquantity_hook;
@@ -113,6 +103,28 @@ namespace unlockall
 			1000069  // zm_bgb_power_vacuum
 		};
 
+		void enable_unlock_hooks()
+		{
+			unlock_dvars_enabled = true;
+		}
+
+		int unlock_active(std::string name)
+		{
+			if (unlock_dvars_enabled)
+			{
+				game::dvar_t* dvar = dvars::find_dvar("shield_unlock_all");
+				std::string res = dvars::get_value_string(dvar, &dvar->value->current);
+				if (res == "1") return 1;
+				dvar = dvars::find_dvar("shield_unlock_" + name);
+				res = dvars::get_value_string(dvar, &dvar->value->current);
+				if (res == "1") return 1;
+			}
+			else
+			{
+				if (unlock["all"] || unlock[name]) return 1;
+			}
+		}
+			
 		inline bool is_zm_loot(int item_id)
 		{
 			auto it = std::find(
@@ -126,7 +138,7 @@ namespace unlockall
 
 		int liveinventory_getitemquantity(const game::ControllerIndex_t controllerIndex, const int item_id)
 		{
-			if (unlock["all"] || unlock["zm_loot"])
+			if (unlock_active("zm_loot"))
 			{
 				int result = is_zm_loot(item_id) ? 999 : 1;
 				return result;
@@ -136,78 +148,55 @@ namespace unlockall
 
 		bool bg_unlockedgetchallengeunlockedforindex(game::eModes mode, const game::ControllerIndex_t controllerIndex, uint16_t index, int32_t itemIndex)
 		{
-			if (unlock["all"] || unlock["challenges"])
-			{
-				return true;
-			}
-			bg_unlockedgetchallengeunlockedforindex_hook.invoke<bool>(mode, controllerIndex, index, itemIndex);
+			if (unlock_active("challenges")) return true;
+			return bg_unlockedgetchallengeunlockedforindex_hook.invoke<bool>(mode, controllerIndex, index, itemIndex);
 		}
 
 		bool bg_unlockablesitemoptionlocked(game::eModes mode, const game::ControllerIndex_t controllerIndex, int itemIndex, int32_t optionIndex)
 		{
-			if (unlock["all"] || unlock["itemoptions"])
-			{
-				return false;
-			}
+			if (unlock_active("itemoptions")) return false;
 			return bg_unlockablesitemoptionlocked_hook.invoke<bool>(mode, controllerIndex, itemIndex, optionIndex);
 		}
 
 		bool bg_unlockablesisitemattachmentlocked(game::eModes mode, const game::ControllerIndex_t controllerIndex, int32_t itemIndex, int32_t attachmentNum)
 		{
-			if (unlock["all"] || unlock["attachments"])
-			{
-				return false;
-			}
+			if (unlock_active("attachments")) return false;
 			return bg_unlockablesisitemattachmentlocked_hook.invoke<bool>(mode, controllerIndex, itemIndex, attachmentNum);
 		}
 
 		bool bg_unlockablesisattachmentslotlocked(game::eModes mode, const game::ControllerIndex_t controllerIndex, int32_t itemIndex, int32_t attachmentSlotIndex)
 		{
-			if (unlock["all"] || unlock["attachmentslot"])
-			{
-				return false;
-			}
+			if (unlock_active("attachmentslot")) return false;
 			return bg_unlockablesisattachmentslotlocked_hook.invoke<bool>(mode, controllerIndex, itemIndex, attachmentSlotIndex);
 		}
 
 		bool bg_unlockablesemblemorbackinglockedbychallenge(game::eModes mode, const game::ControllerIndex_t controllerIndex, void* challengeLookup, bool otherPlayer)
 		{
-			if (unlock["all"] || unlock["emblems"])
-			{
-				return false;
-			}
+			if (unlock_active("emblems")) return false;
 			return bg_unlockablesemblemorbackinglockedbychallenge_hook.invoke<bool>(mode, controllerIndex, challengeLookup, otherPlayer);
 		}
 
 		bool bg_emblemisentitlementbackgroundgranted(const game::ControllerIndex_t controllerIndex, uint16_t backgroundId)
 		{
-			if (unlock["all"] || unlock["backgrounds"])
-			{
-				return true;
-			}
+			if (unlock_active("classes")) return true;
 			return bg_emblemisentitlementbackgroundgranted_hook.invoke<bool>(controllerIndex, backgroundId);
 		}
 
 		bool bg_unlockablesisitemlocked(game::eModes mode, const game::ControllerIndex_t controllerIndex, int32_t itemIndex)
 		{
-			if (unlock["all"] || unlock["items"])
-			{
-				return false;
-			}
+			if (unlock_active("items")) return false;
 			return bg_unlockablesisitemlocked_hook.invoke<bool>(mode, controllerIndex, itemIndex);
 		}
 
 		int32_t bg_unlockablesgetcustomclasscount(game::eModes mode, const game::ControllerIndex_t controllerIndex)
 		{
-			if (unlock["all"] || unlock["classes"])
-			{
-				return 12; // max 12
-			}
+			if (unlock_active("classes")) return 12;
 			return bg_unlockablesgetcustomclasscount_hook.invoke<int>(mode, controllerIndex);
 		}
 
 		void unlock_func(const command::params& params)
 		{
+			bool TF = true;
 			if (params.size() < 2) return;
 
 			std::string arg1 = params[1];
@@ -215,13 +204,10 @@ namespace unlockall
 			if (params.size() == 3)
 			{
 				std::string arg2 = params[2];
-				bool TF = (arg2 == "true" || arg2 == "True" || arg2 == "1");
-				unlock[arg1] = TF;
+				TF = (arg2 == "true" || arg2 == "True" || arg2 == "1");
 			}
-			else
-			{
-				unlock[arg1] = true;
-			}
+			unlock[arg1] = TF;
+			utilities::json_config::WriteBoolean("unlock", arg1.c_str(), TF);
 		}
 
 		class GameStats
@@ -257,10 +243,9 @@ namespace unlockall
 				return;
 			}
 
-			// todo is fix the string format for now pea patching in lua //  
+			// todo. number format issue with single digit input for rank?
 			if (!utilities::string::is_integer(arg3)) return;
 			int num = std::stoi(arg3);
-
 
 			override_stat[arg2] = true;
 
@@ -287,7 +272,6 @@ namespace unlockall
 				if (arg2 == "prestige") playerstats.wz.prestige = num;
 				if (arg2 == "paragonRank") playerstats.wz.paragonRank = num;
 			}
-
 		}
 
 		void get_player_level()
@@ -373,7 +357,6 @@ namespace unlockall
 				if (mode == game::eModes::MODE_ZOMBIES) return playerstats.zm.prestige;
 				if (mode == game::eModes::MODE_WARZONE) return playerstats.wz.prestige;
 			}
-
 			return livestats_getprestige_hook.invoke<int>(mode, controllerIndex);
 		}
 
@@ -395,6 +378,17 @@ namespace unlockall
 		int LiveStorage_GetStatsBufferWithCaller(const game::ControllerIndex_t controllerIndex, int a2, const char* a3, int a4, game::eModes mode, const int statsLocation)
 		{
 		}
+
+		void init_dvars()
+		{
+			for (auto& pair : unlock)
+			{
+				//const char* cmd = utilities::string::va("set shield_unlock_%s %i;", pair.first, pair.second);
+				const char* cmd = utilities::string::va("set shield_unlock_%s %i;", pair.first.c_str(), pair.second);
+				logger::write(logger::LOG_TYPE_INFO, cmd);
+				game::Cbuf_AddText(0, cmd);
+			}
+		}
 	}
 
 	class component final : public component_interface
@@ -402,7 +396,6 @@ namespace unlockall
 	public:
 		void post_unpack() override
 		{
-			command::add("unlock", [&](const command::params& params) { unlock_func(params); });
 			unlock["all"] = utilities::json_config::ReadBoolean("unlock", "all", false);
 			unlock["attachments"] = utilities::json_config::ReadBoolean("unlock", "attachments", false);
 			unlock["attachmentslot"] = utilities::json_config::ReadBoolean("unlock", "attachmentslot", false);
@@ -424,7 +417,6 @@ namespace unlockall
 			bg_unlockablesgetcustomclasscount_hook.create(0x1406ae060_g, bg_unlockablesgetcustomclasscount);
 			bg_unlockablesisitemlocked_hook.create(0x1406B3AA0_g, bg_unlockablesisitemlocked);
 
-			command::add("setplayerstat", [&](const command::params& params) { setplayerstat(params); });
 			livestats_getxp_hook.create(0x1438A78B0_g, livestats_getxp_stub);
 			livestats_getrank_hook.create(0x1438A7430_g, livestats_getrank_stub);
 			livestats_getprestige_hook.create(0x1438A7390_g, livestats_getprestige_stub);
@@ -432,11 +424,14 @@ namespace unlockall
 			// utilities::hook::call(0x1438C2B00_g, sub_1438C2B00_stub); // LiveStats read ddl?
 			// utilities::hook::call(0x143803FF0_g, live_is_user_signed_in_to_demonware_stub); // BAD
 			utilities::hook::call(0x1438A78E7_g, trol_stub);
+
+			command::add("unlock", [&](const command::params& params) { unlock_func(params); });
+			command::add("setplayerstat", [&](const command::params& params) { setplayerstat(params); });
 			command::add("get_player_level", get_player_level);
+			command::add("enable_unlock_hooks", enable_unlock_hooks);
+			command::add("init_dvars", init_dvars);
 		}
 	};
 }
 
 REGISTER_COMPONENT(unlockall::component)
-
-

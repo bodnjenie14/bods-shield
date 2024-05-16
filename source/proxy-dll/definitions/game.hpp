@@ -1211,6 +1211,16 @@ namespace game
 
 	WEAK symbol<void(BO4_AssetRef_t* cmdName, xcommand_t function, cmd_function_t* allocedCmd)> Cmd_AddCommandInternal{ 0x143CDEE80_g };
 
+	// unlock all and stats
+	WEAK symbol<int(const int a1)> LobbySession_GetControllingLobbySession{ 0x1439066F0_g };
+	WEAK symbol<int(const int LobbyModule, const int LobbyType)> LobbySession_GetLobbyMode{ 0x143906830_g };
+	WEAK symbol<int(const game::ControllerIndex_t controllerIndex, const int statsLocation)> LiveStorage_DoWeHaveStats{ 0x1438B79D0_g };
+	WEAK symbol<int(game::eModes mode, const game::ControllerIndex_t controllerIndex)> LiveStats_GetPrestige{ 0x1438A7390_g };
+	WEAK symbol<int(game::eModes mode, const game::ControllerIndex_t controllerIndex)> LiveStats_GetRank{ 0x1438A7430_g };
+	WEAK symbol<int(game::eModes mode, const game::ControllerIndex_t controllerIndex)> LiveStats_GetXp{ 0x1438A78B0_g };
+	WEAK symbol<int(game::eModes mode, const game::ControllerIndex_t controllerIndex, const char* name)> LiveStats_GetIntPlayerStatByKey{ 0x1438A66A0_g };
+	WEAK symbol<int(game::eModes mode, const int Xp)> CL_Rank_GetRankForXP{ 0x1422EF900_g };
+
 #define Cmd_AddCommand(name, function) \
 	static game::cmd_function_t __cmd_func_##function;  \
 	game::BO4_AssetRef_t __cmd_func_name_##function { (int64_t)fnv1a::generate_hash(name), 0 }; \
